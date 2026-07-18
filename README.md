@@ -32,6 +32,12 @@ A small, elegant and **100% local** native Windows app for monitoring your quota
       <td><img src="docs/images/codex-meter-main.png" alt="Codex Meter main dashboard" width="410"></td>
       <td><img src="docs/images/codex-meter-options.png" alt="Codex Meter options window" width="410"></td>
     </tr>
+    <tr>
+      <th colspan="2">Compact widget</th>
+    </tr>
+    <tr>
+      <td colspan="2" align="center"><img src="docs/images/codex-meter-compact.png" alt="Codex Meter compact widget" width="520"></td>
+    </tr>
   </table>
 </div>
 
