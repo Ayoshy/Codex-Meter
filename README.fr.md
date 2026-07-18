@@ -20,6 +20,21 @@ Une petite application Windows native, élégante et **100 % locale** pour surve
 
 ---
 
+## Captures d'écran
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Tableau de bord</th>
+      <th>Options</th>
+    </tr>
+    <tr>
+      <td><img src="docs/images/codex-meter-main.png" alt="Tableau de bord principal de Codex Meter" width="410"></td>
+      <td><img src="docs/images/codex-meter-options.png" alt="Fenêtre des options de Codex Meter" width="410"></td>
+    </tr>
+  </table>
+</div>
+
 ## Ce que vous obtenez
 
 | Quotas | Activité | Confort |
