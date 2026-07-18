@@ -20,6 +20,21 @@ A small, elegant and **100% local** native Windows app for monitoring your quota
 
 ---
 
+## Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Main dashboard</th>
+      <th>Options</th>
+    </tr>
+    <tr>
+      <td><img src="docs/images/codex-meter-main.png" alt="Codex Meter main dashboard" width="410"></td>
+      <td><img src="docs/images/codex-meter-options.png" alt="Codex Meter options window" width="410"></td>
+    </tr>
+  </table>
+</div>
+
 ## What you get
 
 | Quotas | Activity | Convenience |
