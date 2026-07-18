@@ -147,9 +147,6 @@ public sealed class ApiEquivalentEstimator
             var scale = authoritativeLifetimeTokens is > 0
                 ? authoritativeLifetimeTokens.Value / (double)parsedTokens
                 : 1d;
-            var warning = unknownModels.Count == 0
-                ? null
-                : $"Modèles sans tarif ignorés : {string.Join(", ", unknownModels.Order())}";
 
             return new ApiEquivalentEstimate(
                 DollarAmount: rawCost * (decimal)scale,
@@ -159,7 +156,7 @@ public sealed class ApiEquivalentEstimator
                 ParsedSessions: pricedSessions,
                 ScaleFactor: scale,
                 UsesProxyPricing: usesProxy,
-                Warning: warning);
+                UnknownModels: unknownModels.Order(StringComparer.OrdinalIgnoreCase).ToArray());
         }
         finally
         {
@@ -182,6 +179,28 @@ public sealed class ApiEquivalentEstimator
         return (uncachedInput / 1_000_000m * price.InputPerMillion) +
                (cachedInputTokens / 1_000_000m * price.CachedInputPerMillion) +
                (outputTokens / 1_000_000m * price.OutputPerMillion);
+    }
+
+    /// <summary>Removes only Codex Meter's derived estimate cache, never Codex sessions.</summary>
+    public async Task ClearCacheAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _cache = null;
+            if (File.Exists(_cachePath))
+            {
+                File.Delete(_cachePath);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Cache cleanup is optional; the monitor still remains read-only.
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     private IEnumerable<string> EnumerateRollouts()

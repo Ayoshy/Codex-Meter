@@ -11,8 +11,9 @@ internal static class App
         using var mutex = new Mutex(initiallyOwned: true, "Local\\CodexUsageTray", out var isFirstInstance);
         if (!isFirstInstance)
         {
+            var language = new AppSettingsService().Load().Language;
             System.Windows.MessageBox.Show(
-                "Codex Meter est déjà lancé.",
+                AppText.Get(language, TextId.AlreadyRunning),
                 "Codex Meter",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
