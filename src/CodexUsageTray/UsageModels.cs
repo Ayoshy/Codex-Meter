@@ -18,7 +18,7 @@ public sealed record ApiEquivalentEstimate(
     int ParsedSessions,
     double ScaleFactor,
     bool UsesProxyPricing,
-    string? Warning);
+    IReadOnlyList<string> UnknownModels);
 
 public sealed class GetAccountRateLimitsResponse
 {
@@ -121,36 +121,42 @@ public sealed class AccountTokenUsageDailyBucket
 
 public static class UsageFormatter
 {
-    private static readonly CultureInfo FrenchCulture = CultureInfo.GetCultureInfo("fr-FR");
 
-    public static string CompactNumber(long? value)
+    public static string CompactNumber(long? value, AppLanguage language = AppLanguage.English)
     {
         if (value is null)
         {
             return "—";
         }
 
+        var culture = AppText.Culture(language);
+        var (thousand, million, billion) = language == AppLanguage.French
+            ? (" k", " M", " Md")
+            : ("K", "M", "B");
         var absolute = Math.Abs((double)value.Value);
         return absolute switch
         {
-            >= 1_000_000_000 => $"{(value.Value / 1_000_000_000d).ToString("0.##", FrenchCulture)} Md",
-            >= 1_000_000 => $"{(value.Value / 1_000_000d).ToString("0.##", FrenchCulture)} M",
-            >= 1_000 => $"{(value.Value / 1_000d).ToString("0.##", FrenchCulture)} k",
-            _ => value.Value.ToString("N0", FrenchCulture)
+            >= 1_000_000_000 => $"{(value.Value / 1_000_000_000d).ToString("0.##", culture)}{billion}",
+            >= 1_000_000 => $"{(value.Value / 1_000_000d).ToString("0.##", culture)}{million}",
+            >= 1_000 => $"{(value.Value / 1_000d).ToString("0.##", culture)}{thousand}",
+            _ => value.Value.ToString("N0", culture)
         };
     }
 
-    public static string Dollars(decimal? value)
+    public static string Dollars(decimal? value, AppLanguage language = AppLanguage.English)
     {
         if (value is null)
         {
             return "—";
         }
 
-        return value.Value.ToString(value.Value >= 100 ? "$#,##0" : "$#,##0.00", CultureInfo.GetCultureInfo("en-US"));
+        var number = value.Value.ToString(
+            value.Value >= 100 ? "#,##0" : "#,##0.00",
+            AppText.Culture(language));
+        return language == AppLanguage.French ? $"{number} $" : $"${number}";
     }
 
-    public static string WindowLabel(int? minutes) => minutes switch
+    public static string WindowLabel(int? minutes, AppLanguage language = AppLanguage.English) => language == AppLanguage.French ? minutes switch
     {
         10080 => "7 jours",
         1440 => "24 heures",
@@ -159,7 +165,17 @@ public static class UsageFormatter
         > 0 when minutes % 60 == 0 => $"{minutes / 60} heures",
         > 0 => $"{minutes} minutes",
         _ => "Fenêtre courante"
-    };
+    }
+        : minutes switch
+        {
+            10080 => "7 days",
+            1440 => "24 hours",
+            300 => "5 hours",
+            > 0 when minutes % 1440 == 0 => $"{minutes / 1440} days",
+            > 0 when minutes % 60 == 0 => $"{minutes / 60} hours",
+            > 0 => $"{minutes} minutes",
+            _ => AppText.Get(language, TextId.CurrentWindow)
+        };
 
     public static DateTimeOffset? ResetTime(long? unixSeconds)
     {

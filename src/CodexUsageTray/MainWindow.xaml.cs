@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -23,8 +24,13 @@ public partial class MainWindow : Window
     private const double MinimumZoom = 0.80;
     private const double MaximumZoom = 1.50;
     private const double ZoomStep = 0.10;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoActivate = 0x0010;
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNotTopmost = new(-2);
 
-    private static readonly CultureInfo FrenchCulture = CultureInfo.GetCultureInfo("fr-FR");
+    private CultureInfo DisplayCulture => AppText.Culture(DisplayLanguage);
     private static readonly Brush MutedBrush = BrushFrom("#8C97A8");
     private static readonly Brush SubtleBrush = BrushFrom("#616D7E");
     private static readonly Brush CardBrush = BrushFrom("#E8161C25");
@@ -42,9 +48,10 @@ public partial class MainWindow : Window
     public event EventHandler? RefreshRequested;
     public event EventHandler? HideRequested;
 
-    public MainWindow()
+    public MainWindow(AppSettings settings)
     {
         InitializeComponent();
+        InitializeSettings(settings);
     }
 
     public void SetLoading()
@@ -54,9 +61,9 @@ public partial class MainWindow : Window
         StatusBorder.BorderBrush = BrushFrom("#344A40");
         StatusDot.Fill = CyanBrush;
         StatusText.Foreground = BrushFrom("#B9E7FA");
-        StatusText.Text = "Synchronisation avec Codex…";
+        StatusText.Text = AppText.Get(DisplayLanguage, TextId.SyncingWithCodex);
         DockStatusDot.Fill = CyanBrush;
-        DockUpdatedText.Text = "Synchronisation…";
+        DockUpdatedText.Text = AppText.Get(DisplayLanguage, TextId.SyncingWithCodex);
     }
 
     public void ShowError(string message)
@@ -67,9 +74,9 @@ public partial class MainWindow : Window
         StatusDot.Fill = DangerBrush;
         StatusText.Foreground = BrushFrom("#FFB6BD");
         StatusText.Text = message;
-        LastUpdatedText.Text = "Échec de l’actualisation";
+        LastUpdatedText.Text = AppText.Get(DisplayLanguage, TextId.RefreshFailed);
         DockStatusDot.Fill = DangerBrush;
-        DockUpdatedText.Text = "Erreur de synchronisation";
+        DockUpdatedText.Text = AppText.Get(DisplayLanguage, TextId.SyncError);
     }
 
     public void Render(UsageSnapshot snapshot)
@@ -79,9 +86,13 @@ public partial class MainWindow : Window
         StatusBorder.BorderBrush = BrushFrom("#2B5A43");
         StatusDot.Fill = GoodBrush;
         StatusText.Foreground = BrushFrom("#A7F3D0");
+        if (!string.IsNullOrWhiteSpace(snapshot.TokenUsageWarning))
+        {
+            System.Diagnostics.Debug.WriteLine($"Local token history unavailable: {snapshot.TokenUsageWarning}");
+        }
         StatusText.Text = snapshot.TokenUsageWarning is null
-            ? "Connecté · quotas synchronisés"
-            : $"Quotas synchronisés · historique indisponible : {snapshot.TokenUsageWarning}";
+            ? AppText.Get(DisplayLanguage, TextId.QuotasSynced)
+            : AppText.Get(DisplayLanguage, TextId.QuotasSyncedHistoryUnavailable);
         DockStatusDot.Fill = GoodBrush;
 
         LimitsPanel.Children.Clear();
@@ -96,14 +107,15 @@ public partial class MainWindow : Window
             snapshot.TokenUsage,
             snapshot.FetchedAt,
             snapshot.ApiEquivalent?.TodayTokens);
-        TodayTokensText.Text = UsageFormatter.CompactNumber(todayTokens);
-        TodayApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.TodayDollarAmount);
-        LifetimeTokensText.Text = UsageFormatter.CompactNumber(snapshot.TokenUsage?.Summary.LifetimeTokens);
-        LifetimeTokensText.ToolTip = snapshot.TokenUsage?.Summary.LifetimeTokens?.ToString("N0", FrenchCulture);
-        ApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.DollarAmount);
+        TodayTokensText.Text = UsageFormatter.CompactNumber(todayTokens, DisplayLanguage);
+        TodayApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.TodayDollarAmount, DisplayLanguage);
+        LifetimeTokensText.Text = UsageFormatter.CompactNumber(snapshot.TokenUsage?.Summary.LifetimeTokens, DisplayLanguage);
+        LifetimeTokensText.ToolTip = snapshot.TokenUsage?.Summary.LifetimeTokens?.ToString("N0", DisplayCulture);
+        ApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.DollarAmount, DisplayLanguage);
         var estimateDetails = BuildEstimateTooltip(snapshot.ApiEquivalent);
         ApiEquivalentText.ToolTip = estimateDetails;
         TodayApiEquivalentText.ToolTip = estimateDetails;
+        SetEstimateVisibility();
 
         var mainWindow = snapshot.RateLimitResponse.RateLimits.Primary;
         var mainUsedPercent = Math.Clamp(mainWindow?.UsedPercent ?? 0, 0, 100);
@@ -114,48 +126,46 @@ public partial class MainWindow : Window
             >= 80 => WarningBrush,
             _ => GoodBrush
         };
-        DockRemainingText.Text = mainRemainingPercent.ToString("0", FrenchCulture);
+        DockRemainingText.Text = mainRemainingPercent.ToString("0", DisplayCulture);
         DockRemainingText.Foreground = dockAccent;
         DockProgress.Value = mainUsedPercent;
         DockProgress.Foreground = dockAccent;
-        DockTodayTokensText.Text = UsageFormatter.CompactNumber(todayTokens);
-        DockTodayApiEquivalentText.Text = $"{UsageFormatter.Dollars(snapshot.ApiEquivalent?.TodayDollarAmount)} API";
-        DockTotalTokensText.Text = UsageFormatter.CompactNumber(snapshot.TokenUsage?.Summary.LifetimeTokens);
-        DockApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.DollarAmount);
+        DockTodayTokensText.Text = UsageFormatter.CompactNumber(todayTokens, DisplayLanguage);
+        DockTodayApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.TodayDollarAmount, DisplayLanguage);
+        DockTotalTokensText.Text = UsageFormatter.CompactNumber(snapshot.TokenUsage?.Summary.LifetimeTokens, DisplayLanguage);
+        DockApiEquivalentText.Text = UsageFormatter.Dollars(snapshot.ApiEquivalent?.DollarAmount, DisplayLanguage);
         DockApiEquivalentText.ToolTip = estimateDetails;
         DockTodayApiEquivalentText.ToolTip = estimateDetails;
-        DockUpdatedText.Text = $"Synchronisé à {snapshot.FetchedAt:HH:mm:ss}";
+        DockUpdatedText.Text = AppText.Format(DisplayLanguage, TextId.SyncedAt, snapshot.FetchedAt.ToString("HH:mm:ss", DisplayCulture));
 
         var streak = snapshot.TokenUsage?.Summary.CurrentStreakDays;
-        StreakText.Text = streak is null ? "—" : streak.Value.ToString(FrenchCulture);
+        StreakText.Text = streak is null ? "—" : streak.Value.ToString(DisplayCulture);
 
         var resetCredits = snapshot.RateLimitResponse.RateLimitResetCredits?.AvailableCount;
-        ResetCreditsText.Text = resetCredits?.ToString(FrenchCulture) ?? "—";
+        ResetCreditsText.Text = resetCredits?.ToString(DisplayCulture) ?? "—";
         ResetCaptionText.Text = resetCredits switch
         {
-            null => "Information non fournie",
-            0 => "Aucun crédit disponible",
-            1 => "1 crédit prêt à être utilisé dans Codex",
-            _ => $"{resetCredits} crédits prêts à être utilisés dans Codex"
+            null => AppText.Get(DisplayLanguage, TextId.ResetInformationUnavailable),
+            0 => AppText.Get(DisplayLanguage, TextId.NoResetCredits),
+            1 => AppText.Get(DisplayLanguage, TextId.OneResetCredit),
+            _ => AppText.Format(DisplayLanguage, TextId.ManyResetCredits, resetCredits)
         };
-        LastUpdatedText.Text = $"Synchronisé à {snapshot.FetchedAt:HH:mm:ss}";
+        LastUpdatedText.Text = AppText.Format(DisplayLanguage, TextId.SyncedAt, snapshot.FetchedAt.ToString("HH:mm:ss", DisplayCulture));
     }
 
-    private static string BuildEstimateTooltip(ApiEquivalentEstimate? estimate)
+    private string BuildEstimateTooltip(ApiEquivalentEstimate? estimate)
     {
         if (estimate is null)
         {
-            return "Estimation indisponible : aucun compteur local exploitable.";
+            return AppText.Get(DisplayLanguage, TextId.EstimateUnavailable);
         }
 
-        var proxy = estimate.UsesProxyPricing
-            ? " Spark est valorisé au tarif GPT-5.3-Codex, son tarif final n'étant pas public."
-            : string.Empty;
-        var warning = string.IsNullOrWhiteSpace(estimate.Warning) ? string.Empty : $" {estimate.Warning}";
-        return $"Estimation locale sur {estimate.ParsedSessions:N0} sessions, selon les tarifs API publics actuels.{proxy}{warning}";
+        var proxy = estimate.UsesProxyPricing ? AppText.Get(DisplayLanguage, TextId.ProxyPricing) : string.Empty;
+        var warning = estimate.UnknownModels.Count == 0 ? string.Empty : AppText.Format(DisplayLanguage, TextId.UnknownModels, string.Join(", ", estimate.UnknownModels));
+        return AppText.Format(DisplayLanguage, TextId.EstimateDetails, estimate.ParsedSessions) + proxy + warning;
     }
 
-    private static Border CreateLimitCard(string id, RateLimitSnapshot limit, bool isPrimary)
+    private Border CreateLimitCard(string id, RateLimitSnapshot limit, bool isPrimary)
     {
         var window = limit.Primary;
         var usedPercent = Math.Clamp(window?.UsedPercent ?? 0, 0, 100);
@@ -173,8 +183,8 @@ public partial class MainWindow : Window
             : limit.LimitName;
         var resetAt = UsageFormatter.ResetTime(window?.ResetsAt);
         var resetText = resetAt is null
-            ? "Échéance inconnue"
-            : $"Reset {resetAt.Value.ToString("ddd d MMM · HH:mm", FrenchCulture)}";
+            ? AppText.Get(DisplayLanguage, TextId.UnknownDeadline)
+            : AppText.Format(DisplayLanguage, TextId.ResetsAt, resetAt.Value.ToString("ddd d MMM · HH:mm", DisplayCulture));
 
         var content = new StackPanel();
 
@@ -191,7 +201,7 @@ public partial class MainWindow : Window
         });
         heading.Children.Add(new TextBlock
         {
-            Text = isPrimary ? "QUOTA PRINCIPAL" : "QUOTA MODÈLE",
+            Text = AppText.Get(DisplayLanguage, isPrimary ? TextId.MainQuota : TextId.ModelQuota),
             FontSize = 9,
             FontWeight = FontWeights.Bold,
             Foreground = SubtleBrush,
@@ -207,7 +217,7 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Top,
             Child = new TextBlock
             {
-                Text = UsageFormatter.WindowLabel(window?.WindowDurationMins).ToUpper(FrenchCulture),
+                Text = UsageFormatter.WindowLabel(window?.WindowDurationMins, DisplayLanguage).ToUpper(DisplayCulture),
                 Foreground = accent,
                 FontSize = 9,
                 FontWeight = FontWeights.Bold
@@ -224,7 +234,7 @@ public partial class MainWindow : Window
         var remaining = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
         remaining.Children.Add(new TextBlock
         {
-            Text = remainingPercent.ToString("0", FrenchCulture),
+            Text = remainingPercent.ToString("0", DisplayCulture),
             FontSize = isPrimary ? 38 : 25,
             FontWeight = FontWeights.SemiBold,
             Foreground = accent,
@@ -232,7 +242,7 @@ public partial class MainWindow : Window
         });
         remaining.Children.Add(new TextBlock
         {
-            Text = "% restant",
+            Text = AppText.Get(DisplayLanguage, TextId.PercentRemaining),
             FontSize = isPrimary ? 12 : 10.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = accent,
@@ -251,7 +261,7 @@ public partial class MainWindow : Window
         });
         reset.Children.Add(new TextBlock
         {
-            Text = $"{usedPercent.ToString("0.#", FrenchCulture)}% consommé",
+            Text = AppText.Format(DisplayLanguage, TextId.PercentUsed, usedPercent.ToString("0.#", DisplayCulture)),
             Foreground = SubtleBrush,
             FontSize = 9.5,
             Margin = new Thickness(0, 3, 0, 0),
@@ -335,9 +345,10 @@ public partial class MainWindow : Window
         Left = workingAreaTopLeft.X + DockMargin;
         Top = workingAreaTopLeft.Y + DockMargin;
         ShowInTaskbar = false;
-        Topmost = true;
+        ApplyTopmost(_settings.CompactAlwaysOnTop);
         IsDocked = true;
         Activate();
+        PersistWindowState();
     }
 
     private void ExitDockedMode()
@@ -349,11 +360,41 @@ public partial class MainWindow : Window
         Left = _restoreBounds.Left;
         Top = _restoreBounds.Top;
         ShowInTaskbar = true;
-        Topmost = _restoreTopmost;
+        ApplyTopmost(_restoreTopmost);
         IsDocked = false;
         KeepInsideWorkingArea();
         Activate();
+        PersistWindowState();
     }
+
+    private void ApplyTopmost(bool enabled)
+    {
+        Topmost = enabled;
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SetWindowPos(
+            handle,
+            enabled ? HwndTopmost : HwndNotTopmost,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoActivate);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr windowHandle,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -402,6 +443,7 @@ public partial class MainWindow : Window
 
         var oldCenter = new System.Windows.Point(Left + (Width / 2), Top + (Height / 2));
         _zoom = zoom;
+        PublishSettings(_settings with { UiScale = _zoom });
         RootLayout.LayoutTransform = new ScaleTransform(_zoom, _zoom);
 
         var baseWidth = IsDocked ? DockedWidth : FullWidth;

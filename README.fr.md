@@ -52,6 +52,12 @@ cd Codex-Meter
 dotnet run --project .\src\CodexUsageTray\CodexUsageTray.csproj
 ```
 
+## Options
+
+Ouvrez **Paramètres** depuis le menu du tray ou la roue dentée de la fenêtre complète. L’anglais est la langue par défaut ; passez instantanément en Français depuis l’écran Options ou le sous-menu `Langue` du tray.
+
+Les réglages sont stockés localement dans `%LOCALAPPDATA%\CodexMeter\settings.json` : intervalle d’actualisation (1/5/15 minutes), comportement au démarrage (fenêtre complète, widget compact, tray uniquement ou dernière vue utilisée), échelle d’interface (80–150 %), premier plan du widget compact, dernière vue et dernière position de la fenêtre complète. L’estimation équivalente API peut être désactivée ; dans ce cas, Codex Meter n’énumère ni ne lit les fichiers de sessions locaux. **Effacer le cache local d’estimation** supprime uniquement le cache dérivé de Codex Meter, jamais les sessions Codex.
+
 ## Confidentialité et sécurité
 
 Codex Meter fonctionne en lecture seule :

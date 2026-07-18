@@ -12,4 +12,10 @@ artifacts/
 *.userprefs
 .env
 .env.*
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
 !.env.example
