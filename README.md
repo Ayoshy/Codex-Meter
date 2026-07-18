@@ -1,48 +1,50 @@
 <div align="center">
 
+**English** · [**Français**](README.fr.md)
+
 # Codex Meter
 
-### Vos quotas Codex, visibles d'un coup d'œil.
+### Your Codex usage, visible at a glance.
 
-Une petite application Windows native, élégante et **100 % locale** pour surveiller ses quotas, ses tokens et leur équivalent API sans garder `/usage` ouvert.
+A small, elegant and **100% local** native Windows app for monitoring your quotas, tokens and estimated API-equivalent cost without keeping `/usage` open.
 
 [![CI](https://github.com/Ayoshy/Codex-Meter/actions/workflows/ci.yml/badge.svg)](https://github.com/Ayoshy/Codex-Meter/actions/workflows/ci.yml)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-5BC8FF?logo=windows)](https://github.com/Ayoshy/Codex-Meter/releases/latest)
 [![.NET 8](https://img.shields.io/badge/.NET-8-7D6CFF?logo=dotnet)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Lecture seule](https://img.shields.io/badge/Codex-lecture%20seule-55E6A5)](#confidentialité-et-sécurité)
+[![Read only](https://img.shields.io/badge/Codex-read%20only-55E6A5)](#privacy-and-security)
 [![MIT](https://img.shields.io/github/license/Ayoshy/Codex-Meter)](LICENSE)
 
-**[Télécharger la dernière version autonome](https://github.com/Ayoshy/Codex-Meter/releases/latest/download/CodexMeter-win-x64-standalone.zip)**
+**[Download the latest standalone build](https://github.com/Ayoshy/Codex-Meter/releases/latest/download/CodexMeter-win-x64-standalone.zip)**
 
 </div>
 
 ---
 
-## Ce que vous obtenez
+## What you get
 
-| Quotas | Activité | Confort |
+| Quotas | Activity | Convenience |
 | --- | --- | --- |
-| Pourcentage consommé et restant | Tokens du jour et cumulés | Widget compact détachable |
-| Prochain reset | Équivalent estimé aux tarifs API | Icône dynamique dans le tray |
-| Limites séparées par modèle | Série de jours d'utilisation | Actualisation automatique |
-| Crédits de reset disponibles | Calcul entièrement local | Zoom de 80 % à 150 % |
+| Used and remaining percentages | Daily and lifetime tokens | Detachable compact widget |
+| Next reset time | Estimated API-equivalent cost | Dynamic system tray icon |
+| Per-model limits | Usage streak | Automatic refresh |
+| Available reset credits | Fully local calculation | Zoom from 80% to 150% |
 
-Codex Meter affiche les crédits de reset fournis par OpenAI, mais ne propose volontairement aucun bouton pour les consommer.
+Codex Meter displays reset credits provided by OpenAI, but deliberately offers no button to consume them.
 
 ## Installation
 
-### Version autonome — recommandée
+### Standalone build — recommended
 
-1. Téléchargez [`CodexMeter-win-x64-standalone.zip`](https://github.com/Ayoshy/Codex-Meter/releases/latest/download/CodexMeter-win-x64-standalone.zip).
-2. Extrayez l'archive.
-3. Lancez `CodexMeter.exe`.
+1. Download [`CodexMeter-win-x64-standalone.zip`](https://github.com/Ayoshy/Codex-Meter/releases/latest/download/CodexMeter-win-x64-standalone.zip).
+2. Extract the archive.
+3. Run `CodexMeter.exe`.
 
-Cette version embarque .NET. Elle demande uniquement Windows 10/11 et une installation Codex déjà connectée.
+This build bundles .NET. It only requires Windows 10/11 and an existing authenticated Codex installation.
 
 > [!NOTE]
-> L'exécutable n'est pas encore signé. Windows SmartScreen peut donc afficher un avertissement au premier lancement. Les empreintes SHA-256 sont publiées avec chaque release.
+> The executable is not signed yet, so Windows SmartScreen may display a warning on first launch. SHA-256 checksums are published with every release.
 
-### Depuis les sources
+### From source
 
 ```powershell
 git clone https://github.com/Ayoshy/Codex-Meter.git
@@ -50,79 +52,79 @@ cd Codex-Meter
 dotnet run --project .\src\CodexUsageTray\CodexUsageTray.csproj
 ```
 
-## Confidentialité et sécurité
+## Privacy and security
 
-Codex Meter fonctionne en lecture seule :
+Codex Meter operates in read-only mode:
 
-- il démarre localement `codex app-server --stdio` ;
-- il appelle uniquement `account/rateLimits/read` et `account/usage/read` ;
-- il laisse l'authentification à l'installation Codex existante ;
-- il ne lit, ne copie et ne stocke aucun cookie, clé API, access token ou refresh token ;
-- il ne transmet aucune donnée à un serveur tiers ;
-- il ne consomme jamais de crédit de reset.
+- it starts `codex app-server --stdio` locally;
+- it only calls `account/rateLimits/read` and `account/usage/read`;
+- authentication remains entirely managed by the existing Codex installation;
+- it never reads, copies or stores cookies, API keys, access tokens or refresh tokens;
+- it sends no data to third-party servers;
+- it never consumes reset credits.
 
-Pour estimer le coût API, l'application lit les compteurs de tokens et le nom du modèle dans les fichiers de session locaux. Elle ne conserve ni prompt, ni réponse, ni contenu de conversation. Son cache contient uniquement des compteurs agrégés ; les chemins locaux sont remplacés par des empreintes SHA-256 afin de ne pas exposer le nom du profil Windows.
+To estimate API-equivalent cost, the app reads token counters and model names from local Codex session files. It retains no prompts, responses or conversation content. Its cache only contains aggregated counters, and local paths are replaced with SHA-256 hashes so the Windows profile name is never exposed.
 
 ```mermaid
 flowchart LR
-    A["Codex installé et connecté"] -->|stdio local| B["Codex Meter"]
-    C["Compteurs des sessions locales"] -->|lecture seule| B
-    B --> D["Interface Windows + tray"]
-    B -. "aucun envoi" .-> E["Internet / serveur tiers"]
+    A["Codex installed and authenticated"] -->|local stdio| B["Codex Meter"]
+    C["Local session counters"] -->|read only| B
+    B --> D["Windows UI + system tray"]
+    B -. "no outbound data" .-> E["Internet / third-party server"]
 ```
 
-Consultez [SECURITY.md](SECURITY.md) pour signaler une vulnérabilité de manière privée.
+See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
-## À propos de l'estimation API
+## About the API estimate
 
-L'équivalent en dollars est une **estimation locale**, pas une facture. Il applique les tarifs publics entrée, entrée en cache et sortie au modèle détecté, puis rapproche le résultat du total officiel lorsque celui-ci est disponible.
+The dollar equivalent is a **local estimate**, not a bill. It applies public input, cached-input and output prices to the detected model, then reconciles the result with the official lifetime total when available.
 
-Les tarifs GPT-5.6 Sol, Terra et Luna correspondent aux [tarifs officiels OpenAI](https://developers.openai.com/api/docs/models). Spark utilise provisoirement GPT-5.3-Codex comme proxy tant qu'aucun tarif final public distinct n'est disponible.
+GPT-5.6 Sol, Terra and Luna use the [official OpenAI prices](https://developers.openai.com/api/docs/models). Spark temporarily uses GPT-5.3-Codex as a proxy until a separate final public price is available.
 
-Le compteur du jour privilégie le bucket officiel. Si Codex ne publie encore que les journées clôturées, Codex Meter reconstruit la journée active depuis les compteurs locaux.
+The daily counter prefers the official usage bucket. If Codex only reports completed days, Codex Meter reconstructs the active day from local counters.
 
-## Utilisation
+## Usage
 
-- La fenêtre s'ouvre au premier lancement.
-- **Masquer** ou fermer la fenêtre laisse l'application active dans la zone de notification.
-- Un clic gauche sur l'icône la rouvre.
-- Le menu contextuel permet d'actualiser ou de quitter.
-- Le bouton de détachement bascule vers un widget compact.
-- `Ctrl` + molette ajuste toute l'interface entre 80 % et 150 %.
+- The window opens on first launch.
+- **Hide** or closing the window keeps the app running in the system tray.
+- Left-click the tray icon to reopen it.
+- Use the context menu to refresh or exit.
+- The detach button switches to a compact widget.
+- `Ctrl` + mouse wheel scales the entire interface from 80% to 150%.
 
-Si Codex est installé dans un emplacement non standard :
+If Codex is installed in a non-standard location:
 
 ```powershell
-$env:CODEX_USAGE_TRAY_CODEX_PATH = "C:\chemin\vers\codex.exe"
+$env:CODEX_USAGE_TRAY_CODEX_PATH = "C:\path\to\codex.exe"
 ```
 
-## Développement
+## Development
 
 ```powershell
 dotnet build .\CodexUsageTray.sln --configuration Release
 dotnet run --project .\tests\CodexUsageTray.Tests\CodexUsageTray.Tests.csproj --configuration Release
 ```
 
-Créer une publication légère utilisant le runtime .NET 8 installé :
+Create a lightweight build that uses an installed .NET 8 runtime:
 
 ```powershell
 .\scripts\publish.ps1
 ```
 
-Créer un exécutable autonome :
+Create a standalone executable:
 
 ```powershell
 .\scripts\publish.ps1 -SelfContained
 ```
 
-Les sorties restent sous `artifacts\`, qui n'est jamais versionné.
+All output remains under `artifacts\`, which is never committed.
 
-## Contribuer
+## Contributing
 
-Les issues et pull requests sont les bienvenues. Le projet vise une surface réduite : lecture seule, locale, rapide et transparente. Voir [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. The project intentionally keeps a narrow scope: read-only, local, fast and transparent. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Licence et statut
+## License and status
 
-Distribué sous licence [MIT](LICENSE).
+Distributed under the [MIT License](LICENSE).
 
-Codex Meter est un projet communautaire indépendant. Il n'est ni affilié à OpenAI, ni approuvé par OpenAI. « OpenAI » et « Codex » sont des marques de leurs propriétaires respectifs.
+Codex Meter is an independent community project. It is not affiliated with or endorsed by OpenAI. “OpenAI” and “Codex” are trademarks of their respective owners.
