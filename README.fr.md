@@ -32,6 +32,12 @@ Une petite application Windows native, élégante et **100 % locale** pour surve
       <td><img src="docs/images/codex-meter-main.png" alt="Tableau de bord principal de Codex Meter" width="410"></td>
       <td><img src="docs/images/codex-meter-options.png" alt="Fenêtre des options de Codex Meter" width="410"></td>
     </tr>
+    <tr>
+      <th colspan="2">Widget compact</th>
+    </tr>
+    <tr>
+      <td colspan="2" align="center"><img src="docs/images/codex-meter-compact.png" alt="Widget compact de Codex Meter" width="520"></td>
+    </tr>
   </table>
 </div>
 
