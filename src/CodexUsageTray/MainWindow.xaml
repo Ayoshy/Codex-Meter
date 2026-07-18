@@ -1,0 +1,415 @@
+<Window x:Class="CodexUsageTray.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Codex Meter"
+        Width="500"
+        Height="740"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="NoResize"
+        Background="Transparent"
+        Foreground="#F7F8FA"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        ShowInTaskbar="True"
+        KeyDown="Window_KeyDown"
+        PreviewMouseWheel="Window_PreviewMouseWheel">
+    <Window.Resources>
+        <SolidColorBrush x:Key="MutedBrush" Color="#8C97A8" />
+        <SolidColorBrush x:Key="SubtleBrush" Color="#616D7E" />
+        <SolidColorBrush x:Key="CardBrush" Color="#D9161C25" />
+        <SolidColorBrush x:Key="CardHoverBrush" Color="#F01B222D" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#293240" />
+        <SolidColorBrush x:Key="GreenBrush" Color="#55E6A5" />
+        <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#58F0AE" Offset="0" />
+            <GradientStop Color="#5BC8FF" Offset="0.52" />
+            <GradientStop Color="#8A7CFF" Offset="1" />
+        </LinearGradientBrush>
+
+        <Style x:Key="ChromeButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#9BA6B5" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="Button">
+                    <Border x:Name="ChromeBackground" Background="{TemplateBinding Background}" CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ChromeBackground" Property="Background" Value="#222A36" />
+                            <Setter Property="Foreground" Value="#FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="ChromeBackground" Property="Background" Value="#2B3543" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Background" Value="#1B232E" />
+            <Setter Property="Foreground" Value="#DCE3EC" />
+            <Setter Property="BorderBrush" Value="#344152" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="Button">
+                    <Border x:Name="RoundBackground"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="21">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="RoundBackground" Property="Background" Value="#24303D" />
+                            <Setter Property="BorderBrush" Value="#4E6074" />
+                            <Setter Property="Foreground" Value="#FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PillButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1B232E" />
+            <Setter Property="Foreground" Value="#DCE3EC" />
+            <Setter Property="BorderBrush" Value="#344152" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="Button">
+                    <Border x:Name="PillBackground"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="18">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PillBackground" Property="Background" Value="#25303D" />
+                            <Setter Property="BorderBrush" Value="#506076" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StatCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="14,13" />
+        </Style>
+
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="9" />
+            <Setter Property="Background" Value="#252E3A" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                            <Border x:Name="PART_Track" CornerRadius="5" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="5" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="RootLayout">
+        <Border Margin="16"
+                Background="#F50C1016"
+                BorderBrush="#34404F"
+                BorderThickness="1"
+                CornerRadius="22"
+                ClipToBounds="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="9" Opacity="0.55" Color="#000000" />
+            </Border.Effect>
+
+            <Grid>
+                <Ellipse Width="360" Height="360" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-210,-180,0" IsHitTestVisible="False">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#3655E6A5" Offset="0" />
+                            <GradientStop Color="#0055E6A5" Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="300" Height="300" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-190,0,0,-210" IsHitTestVisible="False">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#2A7D6CFF" Offset="0" />
+                            <GradientStop Color="#007D6CFF" Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+
+                <Grid x:Name="FullView">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="58" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="20,8,10,0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="22" Height="22" CornerRadius="7" Background="{StaticResource AccentGradient}">
+                                <TextBlock Text="C" Foreground="#07110D" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Codex Meter" Foreground="#B8C2CE" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="9,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Style="{StaticResource ChromeButtonStyle}"
+                                    Content="◱"
+                                    ToolTip="Détacher en widget"
+                                    FontSize="16"
+                                    Click="ToggleDockButton_Click" />
+                            <Button x:Name="RefreshButton"
+                                    Style="{StaticResource ChromeButtonStyle}"
+                                    Content="↻"
+                                    ToolTip="Actualiser"
+                                    FontSize="17"
+                                    Click="RefreshButton_Click" />
+                            <Button Style="{StaticResource ChromeButtonStyle}" Content="—" Click="MinimizeButton_Click" />
+                            <Button Style="{StaticResource ChromeButtonStyle}" Content="×" Click="CloseButton_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            x:Name="StatusBorder"
+                            Background="#16271F"
+                            BorderBrush="#2B5A43"
+                            BorderThickness="1"
+                            CornerRadius="13"
+                            Padding="12,8"
+                            Margin="28,10,28,14">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusDot" Width="7" Height="7" Fill="#55E6A5" VerticalAlignment="Center" Margin="0,0,9,0" />
+                            <TextBlock x:Name="StatusText" Text="Connexion à Codex…" Foreground="#A7F3D0" FontSize="11.5" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Margin="28,0,28,0">
+                            <StackPanel x:Name="LimitsPanel" />
+
+                            <TextBlock Text="ACTIVITÉ"
+                                       FontSize="10"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource SubtleBrush}"
+                                       Margin="2,9,0,10" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="9" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="9" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Style="{StaticResource StatCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="AUJOURD’HUI" Foreground="{StaticResource SubtleBrush}" FontSize="9" FontWeight="Bold" />
+                                        <TextBlock x:Name="TodayTokensText" Text="—" FontSize="20" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBlock Text="tokens · " Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                                            <TextBlock x:Name="TodayApiEquivalentText" Text="—" Foreground="{StaticResource GreenBrush}" FontSize="10" FontWeight="SemiBold" />
+                                            <TextBlock Text=" API" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="2" Style="{StaticResource StatCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="TOTAL" Foreground="{StaticResource SubtleBrush}" FontSize="9" FontWeight="Bold" />
+                                        <TextBlock x:Name="LifetimeTokensText"
+                                                   Text="—"
+                                                   FontSize="17"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,7,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBlock Text="tokens · " Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                                            <TextBlock x:Name="ApiEquivalentText" Text="—" Foreground="{StaticResource GreenBrush}" FontSize="10" FontWeight="SemiBold" />
+                                            <TextBlock Text=" API" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="4" Style="{StaticResource StatCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="SÉRIE" Foreground="{StaticResource SubtleBrush}" FontSize="9" FontWeight="Bold" />
+                                        <TextBlock x:Name="StreakText" Text="—" FontSize="20" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                        <TextBlock Text="activité" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Border Background="#181F2A"
+                                    BorderBrush="#405267"
+                                    BorderThickness="1"
+                                    CornerRadius="15"
+                                    Padding="15,12"
+                                    Margin="0,10,0,5">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="36" Height="36" CornerRadius="11" Background="#243E38">
+                                        <TextBlock Text="↺" Foreground="#55E6A5" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Reset OpenAI disponible" FontWeight="SemiBold" FontSize="12" />
+                                        <TextBlock x:Name="ResetCaptionText" Text="Crédit fourni par OpenAI" Foreground="{StaticResource MutedBrush}" FontSize="10.5" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="2" MinWidth="38" Height="30" CornerRadius="15" Background="{StaticResource AccentGradient}" Padding="10,0">
+                                        <TextBlock x:Name="ResetCreditsText" Text="—" Foreground="#07110D" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                    </StackPanel>
+
+                    <Grid Grid.Row="3" Margin="28,9,28,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="5" Height="5" Fill="#536173" Margin="0,0,8,0" />
+                            <TextBlock x:Name="LastUpdatedText" Text="Pas encore actualisé" Foreground="{StaticResource MutedBrush}" FontSize="10.5" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource PillButtonStyle}" Content="Masquer dans le tray" Click="HideButton_Click" />
+                    </Grid>
+                </Grid>
+
+                <Grid x:Name="DockedView" Visibility="Collapsed" Margin="18,8,18,14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="34" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="22" Height="22" CornerRadius="7" Background="{StaticResource AccentGradient}">
+                                <TextBlock Text="C" Foreground="#07110D" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Ellipse x:Name="DockStatusDot" Width="6" Height="6" Fill="#55E6A5" Margin="9,0,7,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Codex Meter" Foreground="#B8C2CE" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="DockRefreshButton"
+                                    Style="{StaticResource ChromeButtonStyle}"
+                                    Content="↻"
+                                    ToolTip="Actualiser"
+                                    FontSize="16"
+                                    Click="RefreshButton_Click" />
+                            <Button Style="{StaticResource ChromeButtonStyle}"
+                                    Content="⤢"
+                                    ToolTip="Revenir à la vue complète"
+                                    FontSize="15"
+                                    Click="ToggleDockButton_Click" />
+                            <Button Style="{StaticResource ChromeButtonStyle}" Content="×" ToolTip="Masquer" Click="CloseButton_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="2,7,2,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.05*" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="QUOTA CODEX" Foreground="{StaticResource SubtleBrush}" FontSize="8.5" FontWeight="Bold" />
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock x:Name="DockRemainingText" Text="—" Foreground="{StaticResource GreenBrush}" FontSize="31" FontWeight="SemiBold" />
+                                <TextBlock Text="%" Foreground="{StaticResource GreenBrush}" FontSize="12" FontWeight="Bold" Margin="3,0,0,5" VerticalAlignment="Bottom" />
+                            </StackPanel>
+                            <TextBlock Text="restant" Foreground="{StaticResource MutedBrush}" FontSize="9.5" Margin="1,-2,0,0" />
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Width="1" Background="#2B3543" Margin="0,5" />
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="15,0,0,0">
+                            <TextBlock Text="AUJOURD’HUI" Foreground="{StaticResource SubtleBrush}" FontSize="8.5" FontWeight="Bold" />
+                            <TextBlock x:Name="DockTodayTokensText" Text="—" FontSize="18" FontWeight="SemiBold" Margin="0,7,0,0" />
+                            <TextBlock x:Name="DockTodayApiEquivalentText" Text="—" Foreground="{StaticResource GreenBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,1,0,0" />
+                        </StackPanel>
+
+                        <Border Grid.Column="3" Width="1" Background="#2B3543" Margin="0,5" />
+
+                        <StackPanel Grid.Column="4"
+                                    VerticalAlignment="Center"
+                                    Margin="15,0,0,0"
+                                    ToolTip="Équivalent estimé aux tarifs API publics actuels. Calcul local.">
+                            <TextBlock Text="TOTAL" Foreground="{StaticResource SubtleBrush}" FontSize="8.5" FontWeight="Bold" />
+                            <TextBlock x:Name="DockTotalTokensText" Text="—" FontSize="18" FontWeight="SemiBold" Margin="0,7,0,0" />
+                            <TextBlock x:Name="DockApiEquivalentText" Text="—" Foreground="{StaticResource GreenBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="2" Margin="2,1,2,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ProgressBar x:Name="DockProgress" Grid.Row="0" Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource GreenBrush}" Height="6" />
+                        <TextBlock x:Name="DockUpdatedText"
+                                   Grid.Row="1"
+                                   Text="En attente de synchronisation"
+                                   Foreground="{StaticResource SubtleBrush}"
+                                   FontSize="8.5"
+                                   HorizontalAlignment="Right"
+                                   Margin="0,5,0,0" />
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

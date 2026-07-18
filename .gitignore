@@ -1,0 +1,15 @@
+bin/
+obj/
+artifacts/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.pdb
+*.zip
+*.exe
+*.userprefs
+.env
+.env.*
+!.env.example
