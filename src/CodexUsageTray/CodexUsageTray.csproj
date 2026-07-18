@@ -12,5 +12,6 @@
     <Description>Read-only Codex usage monitor for Windows</Description>
     <RootNamespace>CodexUsageTray</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\CodexMeter.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>
