@@ -54,6 +54,17 @@ public partial class MainWindow : Window
         InitializeSettings(settings);
     }
 
+    private void WindowFrame_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is FrameworkElement frame)
+        {
+            frame.Clip = new RectangleGeometry(
+                new Rect(0, 0, e.NewSize.Width, e.NewSize.Height),
+                22,
+                22);
+        }
+    }
+
     public void SetLoading()
     {
         SetRefreshEnabled(false);
