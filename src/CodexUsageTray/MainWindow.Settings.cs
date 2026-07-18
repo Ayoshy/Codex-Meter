@@ -98,6 +98,7 @@ public partial class MainWindow
         if (IsDocked)
         {
             ApplyTopmost(_settings.CompactAlwaysOnTop);
+            PositionDockedWindow();
         }
     }
 

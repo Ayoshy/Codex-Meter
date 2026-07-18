@@ -23,13 +23,17 @@ public partial class SettingsWindow : Window
         IntervalCombo.SelectionChanged += (_, _) => UpdateFromControls();
         StartupCombo.SelectionChanged += (_, _) => UpdateFromControls();
         ScaleCombo.SelectionChanged += (_, _) => UpdateFromControls();
+        DockCornerCombo.SelectionChanged += (_, _) => UpdateFromControls();
         AlwaysOnTopToggle.Checked += (_, _) => UpdateFromControls();
         AlwaysOnTopToggle.Unchecked += (_, _) => UpdateFromControls();
+        StartWithWindowsToggle.Checked += (_, _) => UpdateFromControls();
+        StartWithWindowsToggle.Unchecked += (_, _) => UpdateFromControls();
         ApiEstimateToggle.Checked += (_, _) => UpdateFromControls();
         ApiEstimateToggle.Unchecked += (_, _) => UpdateFromControls();
         ClearCacheButton.Click += (_, _) => ShowClearCacheConfirmation();
         CancelClearButton.Click += (_, _) => HideClearCacheConfirmation();
         ConfirmClearButton.Click += (_, _) => ConfirmClearCache();
+        ResetSettingsButton.Click += (_, _) => ResetSettingsRequested?.Invoke(this, EventArgs.Empty);
 
         ApplySettings(_settings);
     }
@@ -47,6 +51,7 @@ public partial class SettingsWindow : Window
 
     public event EventHandler<AppSettings>? SettingsChanged;
     public event EventHandler? ClearCacheRequested;
+    public event EventHandler? ResetSettingsRequested;
 
     public void ApplySettings(AppSettings settings)
     {
@@ -60,7 +65,9 @@ public partial class SettingsWindow : Window
             Select(IntervalCombo, _settings.RefreshIntervalMinutes);
             Select(StartupCombo, _settings.StartupBehavior);
             Select(ScaleCombo, _settings.UiScale);
+            Select(DockCornerCombo, _settings.CompactDockCorner);
             AlwaysOnTopToggle.IsChecked = _settings.CompactAlwaysOnTop;
+            StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
             ApiEstimateToggle.IsChecked = _settings.ApiEquivalentEnabled;
         }
         finally
@@ -82,11 +89,14 @@ public partial class SettingsWindow : Window
         IntervalLabel.Text = AppText.Get(language, TextId.RefreshInterval);
         StartupLabel.Text = AppText.Get(language, TextId.StartupBehavior);
         ScaleLabel.Text = AppText.Get(language, TextId.UiScale);
+        DockCornerLabel.Text = AppText.Get(language, TextId.DockPosition);
         AlwaysOnTopToggle.Content = AppText.Get(language, TextId.CompactAlwaysOnTop);
+        StartWithWindowsToggle.Content = AppText.Get(language, TextId.StartWithWindows);
         ApiEstimateToggle.Content = AppText.Get(language, TextId.ApiEquivalent);
         EstimateDescription.Text = AppText.Get(language, TextId.ApiEquivalentDescription);
         ClearCacheButton.Content = AppText.Get(language, TextId.ClearLocalCache);
         CacheDescription.Text = AppText.Get(language, TextId.ClearCacheDescription);
+        ResetSettingsButton.Content = AppText.Get(language, TextId.ResetSettings);
         ConfirmationTitleText.Text = AppText.Get(language, TextId.ClearCacheTitle);
         ConfirmationMessageText.Text = AppText.Get(language, TextId.ClearCacheConfirmation);
         CancelClearButton.Content = AppText.Get(language, TextId.Cancel);
@@ -125,6 +135,13 @@ public partial class SettingsWindow : Window
             new Option<double>(1.40d, "140%"),
             new Option<double>(1.50d, "150%")
         ]);
+        SetItems(DockCornerCombo,
+        [
+            new Option<DockCorner>(DockCorner.TopLeft, AppText.Get(language, TextId.TopLeft)),
+            new Option<DockCorner>(DockCorner.TopRight, AppText.Get(language, TextId.TopRight)),
+            new Option<DockCorner>(DockCorner.BottomLeft, AppText.Get(language, TextId.BottomLeft)),
+            new Option<DockCorner>(DockCorner.BottomRight, AppText.Get(language, TextId.BottomRight))
+        ]);
     }
 
     private void UpdateFromControls()
@@ -133,7 +150,8 @@ public partial class SettingsWindow : Window
             Selected<AppLanguage>(LanguageCombo) is not { } language ||
             Selected<int>(IntervalCombo) is not { } interval ||
             Selected<StartupBehavior>(StartupCombo) is not { } startup ||
-            Selected<double>(ScaleCombo) is not { } scale)
+            Selected<double>(ScaleCombo) is not { } scale ||
+            Selected<DockCorner>(DockCornerCombo) is not { } dockCorner)
         {
             return;
         }
@@ -145,6 +163,8 @@ public partial class SettingsWindow : Window
             StartupBehavior = startup,
             UiScale = scale,
             CompactAlwaysOnTop = AlwaysOnTopToggle.IsChecked == true,
+            CompactDockCorner = dockCorner,
+            StartWithWindows = StartWithWindowsToggle.IsChecked == true,
             ApiEquivalentEnabled = ApiEstimateToggle.IsChecked == true
         });
         if (updated == _settings)

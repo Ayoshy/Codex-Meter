@@ -77,7 +77,7 @@ dotnet run --project .\src\CodexUsageTray\CodexUsageTray.csproj
 
 Open **Settings** from the tray menu or the gear in the full window. English is the default language; switch to Français instantly from either the Options screen or `Language` in the tray menu.
 
-Options are stored locally in `%LOCALAPPDATA%\CodexMeter\settings.json` and cover the refresh interval (1/5/15 minutes), startup behavior (full window, compact widget, tray only, or last used view), UI scale (80–150%), compact-widget always-on-top behavior, the last view, and the last full-window position. API-equivalent estimation can be disabled; when disabled, Codex Meter does not enumerate or read local session files. **Clear local estimate cache** only removes Codex Meter’s derived cache, never Codex sessions.
+Options are stored locally in `%LOCALAPPDATA%\CodexMeter\settings.json` and cover the refresh interval (1/5/15 minutes), startup behavior (full window, compact widget, tray only, or last used view), UI scale (80–150%), compact-widget corner and always-on-top behavior, optional launch with Windows, the last view, and the last full-window position. API-equivalent estimation can be disabled; when disabled, Codex Meter does not enumerate or read local session files. **Clear local estimate cache** only removes Codex Meter’s derived cache, never Codex sessions. **Reset settings** restores the application defaults.
 
 ## Privacy and security
 
