@@ -34,6 +34,17 @@ public partial class SettingsWindow : Window
         ApplySettings(_settings);
     }
 
+    private void WindowFrame_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is FrameworkElement frame)
+        {
+            frame.Clip = new RectangleGeometry(
+                new Rect(0, 0, e.NewSize.Width, e.NewSize.Height),
+                22,
+                22);
+        }
+    }
+
     public event EventHandler<AppSettings>? SettingsChanged;
     public event EventHandler? ClearCacheRequested;
 
