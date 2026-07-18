@@ -165,6 +165,8 @@ static void SettingsDefaultsAndRecovery()
         Equal(AppLanguage.English, defaults.Language);
         Equal(1, defaults.RefreshIntervalMinutes);
         Equal(StartupBehavior.FullWindow, defaults.StartupBehavior);
+        Equal(DockCorner.TopRight, defaults.CompactDockCorner);
+        Equal(false, defaults.StartWithWindows);
         Equal(true, defaults.ApiEquivalentEnabled);
         Directory.CreateDirectory(root);
         File.WriteAllText(path, "{ not valid json");
@@ -176,6 +178,7 @@ static void SettingsDefaultsAndRecovery()
             StartupBehavior = (StartupBehavior)99,
             UiScale = 9d,
             LastView = (WindowView)99,
+            CompactDockCorner = (DockCorner)99,
             ApiEquivalentEnabled = false
         });
         Equal(AppLanguage.English, normalized.Language);
@@ -183,6 +186,7 @@ static void SettingsDefaultsAndRecovery()
         Equal(StartupBehavior.FullWindow, normalized.StartupBehavior);
         Equal(1.5d, normalized.UiScale);
         Equal(WindowView.Full, normalized.LastView);
+        Equal(DockCorner.TopRight, normalized.CompactDockCorner);
         var lastUsed = AppSettingsService.Normalize(new AppSettings
         {
             StartupBehavior = StartupBehavior.LastUsedView,
@@ -213,6 +217,8 @@ static void SettingsPersistence()
             StartupBehavior = StartupBehavior.LastUsedView,
             UiScale = 1.2d,
             CompactAlwaysOnTop = false,
+            CompactDockCorner = DockCorner.BottomLeft,
+            StartWithWindows = true,
             ApiEquivalentEnabled = false,
             LastView = WindowView.Compact,
             WindowLeft = 120d,

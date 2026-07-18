@@ -24,6 +24,14 @@ public enum WindowView
     Compact
 }
 
+public enum DockCorner
+{
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight
+}
+
 /// <summary>Preferences kept locally for Codex Meter. They never contain Codex credentials or session data.</summary>
 public sealed record AppSettings
 {
@@ -32,6 +40,8 @@ public sealed record AppSettings
     public StartupBehavior StartupBehavior { get; init; } = StartupBehavior.FullWindow;
     public double UiScale { get; init; } = 1d;
     public bool CompactAlwaysOnTop { get; init; } = true;
+    public DockCorner CompactDockCorner { get; init; } = DockCorner.TopRight;
+    public bool StartWithWindows { get; init; }
     public bool ApiEquivalentEnabled { get; init; } = true;
     public WindowView LastView { get; init; } = WindowView.Full;
     public double? WindowLeft { get; init; }
@@ -120,6 +130,9 @@ public sealed class AppSettingsService
             ? settings.StartupBehavior
             : StartupBehavior.FullWindow;
         var lastView = Enum.IsDefined(settings.LastView) ? settings.LastView : WindowView.Full;
+        var dockCorner = Enum.IsDefined(settings.CompactDockCorner)
+            ? settings.CompactDockCorner
+            : DockCorner.TopRight;
         var scale = double.IsFinite(settings.UiScale)
             ? Math.Round(Math.Clamp(settings.UiScale, 0.80d, 1.50d), 2)
             : 1d;
@@ -131,6 +144,7 @@ public sealed class AppSettingsService
             StartupBehavior = startupBehavior,
             UiScale = scale,
             LastView = lastView,
+            CompactDockCorner = dockCorner,
             WindowLeft = IsValidCoordinate(settings.WindowLeft) ? settings.WindowLeft : null,
             WindowTop = IsValidCoordinate(settings.WindowTop) ? settings.WindowTop : null
         };

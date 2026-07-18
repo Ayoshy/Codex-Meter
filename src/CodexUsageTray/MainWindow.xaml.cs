@@ -346,20 +346,43 @@ public partial class MainWindow : Window
         var screen = Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
         var transformFromDevice = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice
             ?? Matrix.Identity;
-        var workingAreaTopLeft = transformFromDevice.Transform(
-            new System.Windows.Point(screen.WorkingArea.Left, screen.WorkingArea.Top));
 
         FullView.Visibility = Visibility.Collapsed;
         DockedView.Visibility = Visibility.Visible;
         Width = DockedWidth * _zoom;
         Height = DockedHeight * _zoom;
-        Left = workingAreaTopLeft.X + DockMargin;
-        Top = workingAreaTopLeft.Y + DockMargin;
+        PositionDockedWindow(screen, transformFromDevice);
         ShowInTaskbar = false;
         ApplyTopmost(_settings.CompactAlwaysOnTop);
         IsDocked = true;
         Activate();
         PersistWindowState();
+    }
+
+    private void PositionDockedWindow()
+    {
+        var screen = Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
+        var transformFromDevice = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice
+            ?? Matrix.Identity;
+        PositionDockedWindow(screen, transformFromDevice);
+    }
+
+    private void PositionDockedWindow(Forms.Screen screen, Matrix transformFromDevice)
+    {
+        var topLeft = transformFromDevice.Transform(
+            new System.Windows.Point(screen.WorkingArea.Left, screen.WorkingArea.Top));
+        var bottomRight = transformFromDevice.Transform(
+            new System.Windows.Point(screen.WorkingArea.Right, screen.WorkingArea.Bottom));
+        var right = bottomRight.X - Width - DockMargin;
+        var bottom = bottomRight.Y - Height - DockMargin;
+
+        (Left, Top) = _settings.CompactDockCorner switch
+        {
+            DockCorner.TopLeft => (topLeft.X + DockMargin, topLeft.Y + DockMargin),
+            DockCorner.BottomLeft => (topLeft.X + DockMargin, bottom),
+            DockCorner.BottomRight => (right, bottom),
+            _ => (right, topLeft.Y + DockMargin)
+        };
     }
 
     private void ExitDockedMode()

@@ -31,6 +31,7 @@ internal sealed class TrayApplicationController : IDisposable
     {
         _application = application;
         _settings = _settingsService.Load();
+        WindowsStartupRegistration.SetEnabled(_settings.StartWithWindows);
         _window = new MainWindow(_settings);
         _window.RefreshRequested += async (_, _) => await RefreshAsync();
         _window.HideRequested += (_, _) =>
@@ -170,6 +171,7 @@ internal sealed class TrayApplicationController : IDisposable
         }
         window.SettingsChanged += OnSettingsChanged;
         window.ClearCacheRequested += async (_, _) => await ClearEstimateCacheAsync();
+        window.ResetSettingsRequested += (_, _) => OnSettingsChanged(window, new AppSettings());
         window.Closed += (_, _) => _settingsWindow = null;
         return window;
     }
@@ -182,6 +184,10 @@ internal sealed class TrayApplicationController : IDisposable
         var previous = _settings;
         _settings = AppSettingsService.Normalize(settings);
         _settingsService.Save(_settings);
+        if (_settings.StartWithWindows != previous.StartWithWindows)
+        {
+            WindowsStartupRegistration.SetEnabled(_settings.StartWithWindows);
+        }
         _window.ApplySettings(_settings);
         _settingsWindow?.ApplySettings(_settings);
         _refreshTimer.Interval = TimeSpan.FromMinutes(_settings.RefreshIntervalMinutes);
