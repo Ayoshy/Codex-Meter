@@ -54,6 +54,7 @@ public enum TextId
     UnknownModels,
     EstimateTooltip,
     Options,
+    SettingsSubtitle,
     General,
     RefreshInterval,
     StartupBehavior,
@@ -70,6 +71,7 @@ public enum TextId
     ClearCacheConfirmation,
     ClearCacheTitle,
     CacheCleared,
+    Cancel,
     OneMinute,
     FiveMinutes,
     FifteenMinutes
@@ -129,6 +131,7 @@ public static class AppText
         [TextId.UnknownModels] = " Models without public prices were skipped: {0}.",
         [TextId.EstimateTooltip] = "Estimated using current public API prices. Local calculation only.",
         [TextId.Options] = "Options",
+        [TextId.SettingsSubtitle] = "Tune Codex Meter to your desk.",
         [TextId.General] = "GENERAL",
         [TextId.RefreshInterval] = "Refresh interval",
         [TextId.StartupBehavior] = "At startup",
@@ -145,6 +148,7 @@ public static class AppText
         [TextId.ClearCacheConfirmation] = "Clear Codex Meter’s local estimate cache? This does not affect Codex or its sessions.",
         [TextId.ClearCacheTitle] = "Clear local cache",
         [TextId.CacheCleared] = "Local estimate cache cleared.",
+        [TextId.Cancel] = "Cancel",
         [TextId.OneMinute] = "1 minute",
         [TextId.FiveMinutes] = "5 minutes",
         [TextId.FifteenMinutes] = "15 minutes"
@@ -202,6 +206,7 @@ public static class AppText
         [TextId.UnknownModels] = " Modèles sans tarif public ignorés : {0}.",
         [TextId.EstimateTooltip] = "Équivalent estimé aux tarifs API publics actuels. Calcul local.",
         [TextId.Options] = "Options",
+        [TextId.SettingsSubtitle] = "Adaptez Codex Meter \u00e0 votre bureau.",
         [TextId.General] = "GÉNÉRAL",
         [TextId.RefreshInterval] = "Intervalle d’actualisation",
         [TextId.StartupBehavior] = "Au démarrage",
@@ -218,6 +223,7 @@ public static class AppText
         [TextId.ClearCacheConfirmation] = "Effacer le cache local d’estimation de Codex Meter ? Cela n’affecte ni Codex ni ses sessions.",
         [TextId.ClearCacheTitle] = "Effacer le cache local",
         [TextId.CacheCleared] = "Cache local d’estimation effacé.",
+        [TextId.Cancel] = "Annuler",
         [TextId.OneMinute] = "1 minute",
         [TextId.FiveMinutes] = "5 minutes",
         [TextId.FifteenMinutes] = "15 minutes"
