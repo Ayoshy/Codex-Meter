@@ -227,11 +227,22 @@
                     <StackPanel Grid.Row="2" Margin="28,0,28,0">
                             <StackPanel x:Name="LimitsPanel" />
 
-                            <TextBlock Text="ACTIVITÉ"
-                                       FontSize="10"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource SubtleBrush}"
-                                       Margin="2,9,0,10" />
+                            <Grid Margin="2,9,0,10">
+                                <TextBlock Text="ACTIVITÉ"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource SubtleBrush}"
+                                           VerticalAlignment="Center" />
+                                <Button x:Name="ModelDetailsButton"
+                                        Style="{StaticResource PillButtonStyle}"
+                                        Content="DÉTAIL PAR MODÈLE"
+                                        Height="27"
+                                        Padding="11,0"
+                                        HorizontalAlignment="Right"
+                                        FontSize="9"
+                                        Click="ModelDetailsButton_Click"
+                                        IsEnabled="False" />
+                            </Grid>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>

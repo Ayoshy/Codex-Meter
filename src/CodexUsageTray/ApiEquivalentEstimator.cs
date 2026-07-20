@@ -12,8 +12,6 @@ namespace CodexUsageTray;
 /// </summary>
 public sealed class ApiEquivalentEstimator
 {
-    private const int InitialTailBytes = 512 * 1024;
-    private const int MaximumTailBytes = 8 * 1024 * 1024;
     private const string SparkModel = "gpt-5.3-codex-spark";
 
     private static readonly JsonSerializerOptions CacheJsonOptions = new()
@@ -60,7 +58,7 @@ public sealed class ApiEquivalentEstimator
         _cachePath = cachePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CodexMeter",
-            "api-equivalent-cache-v3.json");
+            "api-equivalent-cache-v4.json");
     }
 
     public async Task<ApiEquivalentEstimate?> EstimateAsync(
@@ -83,12 +81,12 @@ public sealed class ApiEquivalentEstimator
                 if (_cache.TryGetValue(cacheKey, out var cached) &&
                     cached.Length == info.Length &&
                     cached.LastWriteUtcTicks == info.LastWriteTimeUtc.Ticks &&
-                    !string.IsNullOrWhiteSpace(cached.Model))
+                    cached.Models is { Count: > 0 })
                 {
                     continue;
                 }
 
-                var parsed = await ParseTailAsync(path, info, cached, cancellationToken).ConfigureAwait(false);
+                var parsed = await ParseFileAsync(path, info, cached, cancellationToken).ConfigureAwait(false);
                 if (parsed is not null)
                 {
                     _cache[cacheKey] = parsed;
@@ -109,34 +107,58 @@ public sealed class ApiEquivalentEstimator
             var pricedSessions = 0;
             var usesProxy = false;
             var unknownModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var modelTotals = new Dictionary<ModelEffortKey, ModelTotals>();
 
             var today = DateOnly.FromDateTime(DateTime.Now);
             foreach (var item in _cache.Values)
             {
                 var isToday = item.RolloutDate == today;
-                if (isToday)
+                var pricedSession = false;
+                foreach (var model in item.Models)
                 {
-                    todayTokens += item.TotalTokens;
+                    var key = new ModelEffortKey(model.Model, model.Effort);
+                    if (!modelTotals.TryGetValue(key, out var totals))
+                    {
+                        totals = new ModelTotals();
+                        modelTotals[key] = totals;
+                    }
+
+                    totals.InputTokens += model.InputTokens;
+                    totals.CachedInputTokens += model.CachedInputTokens;
+                    totals.OutputTokens += model.OutputTokens;
+                    totals.TotalTokens += model.TotalTokens;
+                    totals.Sessions++;
+
+                    if (!Prices.TryGetValue(model.Model, out var price))
+                    {
+                        unknownModels.Add(model.Model);
+                        continue;
+                    }
+
+                    var uncachedInput = Math.Max(0, model.InputTokens - model.CachedInputTokens);
+                    var itemCost = (uncachedInput / 1_000_000m * price.InputPerMillion) +
+                                   (model.CachedInputTokens / 1_000_000m * price.CachedInputPerMillion) +
+                                   (model.OutputTokens / 1_000_000m * price.OutputPerMillion);
+                    totals.HasPrice = true;
+                    totals.RawCost += itemCost;
+                    rawCost += itemCost;
+                    if (isToday)
+                    {
+                        todayRawCost += itemCost;
+                    }
+                    parsedTokens += model.TotalTokens;
+                    pricedSession = true;
+                    usesProxy |= model.Model.Equals(SparkModel, StringComparison.OrdinalIgnoreCase);
                 }
 
-                if (!Prices.TryGetValue(item.Model, out var price))
-                {
-                    unknownModels.Add(string.IsNullOrWhiteSpace(item.Model) ? "inconnu" : item.Model);
-                    continue;
-                }
-
-                var uncachedInput = Math.Max(0, item.InputTokens - item.CachedInputTokens);
-                var itemCost = (uncachedInput / 1_000_000m * price.InputPerMillion) +
-                               (item.CachedInputTokens / 1_000_000m * price.CachedInputPerMillion) +
-                               (item.OutputTokens / 1_000_000m * price.OutputPerMillion);
-                rawCost += itemCost;
                 if (isToday)
                 {
-                    todayRawCost += itemCost;
+                    todayTokens += item.Models.Sum(model => model.TotalTokens);
                 }
-                parsedTokens += item.TotalTokens;
-                pricedSessions++;
-                usesProxy |= item.Model.Equals(SparkModel, StringComparison.OrdinalIgnoreCase);
+                if (pricedSession)
+                {
+                    pricedSessions++;
+                }
             }
 
             if (pricedSessions == 0 || parsedTokens <= 0)
@@ -147,6 +169,26 @@ public sealed class ApiEquivalentEstimator
             var scale = authoritativeLifetimeTokens is > 0
                 ? authoritativeLifetimeTokens.Value / (double)parsedTokens
                 : 1d;
+            var observedTokens = modelTotals.Values.Sum(item => item.TotalTokens);
+            var models = modelTotals
+                .Select(pair => new ModelUsageBreakdown(
+                    Model: pair.Key.Model,
+                    Effort: pair.Key.Effort,
+                    InputTokens: pair.Value.InputTokens,
+                    CachedInputTokens: pair.Value.CachedInputTokens,
+                    OutputTokens: pair.Value.OutputTokens,
+                    TotalTokens: pair.Value.TotalTokens,
+                    Sessions: pair.Value.Sessions,
+                    DollarAmount: pair.Value.HasPrice
+                        ? pair.Value.RawCost * (decimal)scale
+                        : null,
+                    TokenSharePercent: observedTokens > 0
+                        ? pair.Value.TotalTokens / (double)observedTokens * 100d
+                        : 0d))
+                .OrderByDescending(item => item.TotalTokens)
+                .ThenBy(item => item.Model, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.Effort, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
             return new ApiEquivalentEstimate(
                 DollarAmount: rawCost * (decimal)scale,
@@ -156,7 +198,8 @@ public sealed class ApiEquivalentEstimator
                 ParsedSessions: pricedSessions,
                 ScaleFactor: scale,
                 UsesProxyPricing: usesProxy,
-                UnknownModels: unknownModels.Order(StringComparer.OrdinalIgnoreCase).ToArray());
+                UnknownModels: unknownModels.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                Models: models);
         }
         finally
         {
@@ -233,52 +276,103 @@ public sealed class ApiEquivalentEstimator
         }
     }
 
-    private static async Task<FileEstimate?> ParseTailAsync(
+    private static async Task<FileEstimate?> ParseFileAsync(
         string path,
         FileInfo info,
         FileEstimate? previous,
         CancellationToken cancellationToken)
     {
-        var requestedBytes = Math.Min(InitialTailBytes, info.Length);
-        while (requestedBytes > 0)
+        var canAppend = previous is { Models.Count: > 0 } &&
+                        previous.Length > 0 &&
+                        previous.Length < info.Length;
+        var startOffset = canAppend ? previous!.Length : 0;
+        var currentModel = canAppend ? previous!.CurrentModel : string.Empty;
+        var currentEffort = canAppend ? previous!.CurrentEffort : string.Empty;
+        var lastUsage = canAppend ? previous!.LastUsage : default;
+        var hasUsage = canAppend && previous!.HasUsage;
+        var totals = canAppend
+            ? previous!.Models.ToDictionary(
+                item => new ModelEffortKey(item.Model, item.Effort),
+                item => new FileModelTotals(item))
+            : new Dictionary<ModelEffortKey, FileModelTotals>();
+
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            bufferSize: 64 * 1024,
+            useAsync: true);
+        stream.Seek(startOffset, SeekOrigin.Begin);
+        using var reader = new StreamReader(
+            stream,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: startOffset == 0,
+            bufferSize: 64 * 1024,
+            leaveOpen: false);
+
+        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
-            var text = await ReadTailAsync(path, requestedBytes, cancellationToken).ConfigureAwait(false);
-            if (TryParseLatestSnapshot(text, out var model, out var usage))
+            if (line.Contains("\"type\":\"turn_context\"", StringComparison.Ordinal))
             {
-                if (string.IsNullOrWhiteSpace(model))
+                var context = TryReadContext(line);
+                if (!string.IsNullOrWhiteSpace(context.Model))
                 {
-                    var head = await ReadHeadAsync(path, Math.Min(2 * 1024 * 1024, info.Length), cancellationToken)
-                        .ConfigureAwait(false);
-                    model = TryParseAnyModel(head) ?? previous?.Model ?? string.Empty;
+                    currentModel = context.Model;
                 }
-
-                return new FileEstimate(
-                    info.Length,
-                    info.LastWriteTimeUtc.Ticks,
-                    string.IsNullOrWhiteSpace(model) ? previous?.Model ?? string.Empty : model,
-                    TryReadRolloutDate(path),
-                    usage.InputTokens,
-                    usage.CachedInputTokens,
-                    usage.OutputTokens,
-                    usage.TotalTokens);
+                if (!string.IsNullOrWhiteSpace(context.Effort))
+                {
+                    currentEffort = context.Effort;
+                }
+                continue;
             }
 
-            if (requestedBytes >= info.Length || requestedBytes >= MaximumTailBytes)
+            if (!line.Contains("\"type\":\"token_count\"", StringComparison.Ordinal) ||
+                !TryReadUsage(line, out var usage))
             {
-                break;
+                continue;
             }
 
-            requestedBytes = Math.Min(Math.Min(requestedBytes * 2, MaximumTailBytes), info.Length);
+            var delta = hasUsage ? usage.DeltaFrom(lastUsage) : usage;
+            lastUsage = usage;
+            hasUsage = true;
+            if (delta.TotalTokens <= 0)
+            {
+                continue;
+            }
+
+            var key = new ModelEffortKey(
+                NormalizeModel(currentModel),
+                NormalizeEffort(currentEffort));
+            if (!totals.TryGetValue(key, out var modelTotals))
+            {
+                modelTotals = new FileModelTotals();
+                totals[key] = modelTotals;
+            }
+            modelTotals.Add(delta);
         }
 
-        return previous is null
-            ? null
-            : previous with
-            {
-                Length = info.Length,
-                LastWriteUtcTicks = info.LastWriteTimeUtc.Ticks,
-                RolloutDate = TryReadRolloutDate(path)
-            };
+        var processedLength = stream.Position;
+        if (totals.Count == 0)
+        {
+            return null;
+        }
+
+        var models = totals
+            .Select(pair => pair.Value.ToEstimate(pair.Key))
+            .OrderByDescending(item => item.TotalTokens)
+            .ThenBy(item => item.Model, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Effort, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return new FileEstimate(
+            processedLength,
+            info.LastWriteTimeUtc.Ticks,
+            TryReadRolloutDate(path),
+            currentModel,
+            currentEffort,
+            hasUsage,
+            lastUsage,
+            models);
     }
 
     private static string CacheKey(string path)
@@ -287,116 +381,11 @@ public sealed class ApiEquivalentEstimator
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedPath)));
     }
 
-    private static async Task<string> ReadTailAsync(
-        string path,
-        long requestedBytes,
-        CancellationToken cancellationToken)
-    {
-        await using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite | FileShare.Delete,
-            bufferSize: 64 * 1024,
-            useAsync: true);
-        var length = (int)Math.Min(requestedBytes, stream.Length);
-        stream.Seek(-length, SeekOrigin.End);
-        var buffer = new byte[length];
-        var offset = 0;
-        while (offset < length)
-        {
-            var read = await stream.ReadAsync(buffer.AsMemory(offset, length - offset), cancellationToken)
-                .ConfigureAwait(false);
-            if (read == 0)
-            {
-                break;
-            }
+    private static string NormalizeModel(string? model) =>
+        string.IsNullOrWhiteSpace(model) ? "unknown" : model.Trim().ToLowerInvariant();
 
-            offset += read;
-        }
-
-        return Encoding.UTF8.GetString(buffer, 0, offset);
-    }
-
-    private static async Task<string> ReadHeadAsync(
-        string path,
-        long requestedBytes,
-        CancellationToken cancellationToken)
-    {
-        await using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite | FileShare.Delete,
-            bufferSize: 64 * 1024,
-            useAsync: true);
-        var length = (int)Math.Min(requestedBytes, stream.Length);
-        var buffer = new byte[length];
-        var offset = 0;
-        while (offset < length)
-        {
-            var read = await stream.ReadAsync(buffer.AsMemory(offset, length - offset), cancellationToken)
-                .ConfigureAwait(false);
-            if (read == 0)
-            {
-                break;
-            }
-
-            offset += read;
-        }
-
-        return Encoding.UTF8.GetString(buffer, 0, offset);
-    }
-
-    private static bool TryParseLatestSnapshot(
-        string tail,
-        out string model,
-        out TokenBreakdown usage)
-    {
-        model = string.Empty;
-        usage = default;
-        var lines = tail.Split('\n');
-
-        for (var index = lines.Length - 1; index >= 0; index--)
-        {
-            var line = lines[index];
-            if (string.IsNullOrWhiteSpace(model) && line.Contains("\"type\":\"turn_context\"", StringComparison.Ordinal))
-            {
-                model = TryReadModel(line) ?? string.Empty;
-            }
-
-            if (usage.TotalTokens == 0 && line.Contains("\"type\":\"token_count\"", StringComparison.Ordinal))
-            {
-                usage = TryReadUsage(line);
-            }
-
-            if (!string.IsNullOrWhiteSpace(model) && usage.TotalTokens > 0)
-            {
-                return true;
-            }
-        }
-
-        return usage.TotalTokens > 0;
-    }
-
-    private static string? TryParseAnyModel(string text)
-    {
-        foreach (var line in text.Split('\n'))
-        {
-            if (!line.Contains("\"type\":\"turn_context\"", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var model = TryReadModel(line);
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                return model;
-            }
-        }
-
-        return null;
-    }
+    private static string NormalizeEffort(string? effort) =>
+        string.IsNullOrWhiteSpace(effort) ? "unspecified" : effort.Trim().ToLowerInvariant();
 
     private static DateOnly? TryReadRolloutDate(string path)
     {
@@ -418,21 +407,31 @@ public sealed class ApiEquivalentEstimator
             : null;
     }
 
-    private static string? TryReadModel(string line)
+    private static (string? Model, string? Effort) TryReadContext(string line)
     {
         try
         {
             using var document = JsonDocument.Parse(line);
-            return document.RootElement.GetProperty("payload").GetProperty("model").GetString();
+            var payload = document.RootElement.GetProperty("payload");
+            var model = payload.TryGetProperty("model", out var modelElement)
+                ? modelElement.GetString()
+                : null;
+            var effort = payload.TryGetProperty("effort", out var effortElement)
+                ? effortElement.GetString()
+                : payload.TryGetProperty("reasoning_effort", out var reasoningEffortElement)
+                    ? reasoningEffortElement.GetString()
+                    : null;
+            return (model, effort);
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            return null;
+            return default;
         }
     }
 
-    private static TokenBreakdown TryReadUsage(string line)
+    private static bool TryReadUsage(string line, out TokenBreakdown usage)
     {
+        usage = default;
         try
         {
             using var document = JsonDocument.Parse(line);
@@ -440,15 +439,16 @@ public sealed class ApiEquivalentEstimator
                 .GetProperty("payload")
                 .GetProperty("info")
                 .GetProperty("total_token_usage");
-            return new TokenBreakdown(
+            usage = new TokenBreakdown(
                 total.GetProperty("input_tokens").GetInt64(),
                 total.GetProperty("cached_input_tokens").GetInt64(),
                 total.GetProperty("output_tokens").GetInt64(),
                 total.GetProperty("total_tokens").GetInt64());
+            return true;
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            return default;
+            return false;
         }
     }
 
@@ -512,16 +512,91 @@ public sealed class ApiEquivalentEstimator
     private sealed record FileEstimate(
         long Length,
         long LastWriteUtcTicks,
-        string Model,
         DateOnly? RolloutDate,
+        string CurrentModel,
+        string CurrentEffort,
+        bool HasUsage,
+        TokenBreakdown LastUsage,
+        IReadOnlyList<FileModelEstimate> Models);
+
+    private sealed record FileModelEstimate(
+        string Model,
+        string Effort,
         long InputTokens,
         long CachedInputTokens,
         long OutputTokens,
         long TotalTokens);
 
+    private readonly record struct ModelEffortKey(string Model, string Effort);
+
+    private sealed class FileModelTotals
+    {
+        public FileModelTotals()
+        {
+        }
+
+        public FileModelTotals(FileModelEstimate estimate)
+        {
+            InputTokens = estimate.InputTokens;
+            CachedInputTokens = estimate.CachedInputTokens;
+            OutputTokens = estimate.OutputTokens;
+            TotalTokens = estimate.TotalTokens;
+        }
+
+        public long InputTokens { get; private set; }
+        public long CachedInputTokens { get; private set; }
+        public long OutputTokens { get; private set; }
+        public long TotalTokens { get; private set; }
+
+        public void Add(TokenBreakdown usage)
+        {
+            InputTokens += usage.InputTokens;
+            CachedInputTokens += usage.CachedInputTokens;
+            OutputTokens += usage.OutputTokens;
+            TotalTokens += usage.TotalTokens;
+        }
+
+        public FileModelEstimate ToEstimate(ModelEffortKey key) => new(
+            key.Model,
+            key.Effort,
+            InputTokens,
+            CachedInputTokens,
+            OutputTokens,
+            TotalTokens);
+    }
+
+    private sealed class ModelTotals
+    {
+        public long InputTokens { get; set; }
+        public long CachedInputTokens { get; set; }
+        public long OutputTokens { get; set; }
+        public long TotalTokens { get; set; }
+        public int Sessions { get; set; }
+        public bool HasPrice { get; set; }
+        public decimal RawCost { get; set; }
+    }
+
     private readonly record struct TokenBreakdown(
         long InputTokens,
         long CachedInputTokens,
         long OutputTokens,
-        long TotalTokens);
+        long TotalTokens)
+    {
+        public TokenBreakdown DeltaFrom(TokenBreakdown previous)
+        {
+            if (InputTokens < previous.InputTokens ||
+                CachedInputTokens < previous.CachedInputTokens ||
+                OutputTokens < previous.OutputTokens ||
+                TotalTokens < previous.TotalTokens)
+            {
+                return this;
+            }
+
+            return new TokenBreakdown(
+                InputTokens - previous.InputTokens,
+                CachedInputTokens - previous.CachedInputTokens,
+                OutputTokens - previous.OutputTokens,
+                TotalTokens - previous.TotalTokens);
+        }
+    }
 }
