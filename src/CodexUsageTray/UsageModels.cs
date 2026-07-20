@@ -18,7 +18,19 @@ public sealed record ApiEquivalentEstimate(
     int ParsedSessions,
     double ScaleFactor,
     bool UsesProxyPricing,
-    IReadOnlyList<string> UnknownModels);
+    IReadOnlyList<string> UnknownModels,
+    IReadOnlyList<ModelUsageBreakdown> Models);
+
+public sealed record ModelUsageBreakdown(
+    string Model,
+    string Effort,
+    long InputTokens,
+    long CachedInputTokens,
+    long OutputTokens,
+    long TotalTokens,
+    int Sessions,
+    decimal? DollarAmount,
+    double TokenSharePercent);
 
 public sealed class GetAccountRateLimitsResponse
 {

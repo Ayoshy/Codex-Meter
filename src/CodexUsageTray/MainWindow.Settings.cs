@@ -145,6 +145,7 @@ public partial class MainWindow
         SetParentVisibility(ApiEquivalentText, visibility);
         DockTodayApiEquivalentText.Visibility = visibility;
         DockApiEquivalentText.Visibility = visibility;
+        ModelDetailsButton.Visibility = visibility;
     }
 
     private static void SetParentVisibility(FrameworkElement element, Visibility visibility)
@@ -203,6 +204,8 @@ public partial class MainWindow
                 element.ToolTip = AppText.Get(DisplayLanguage, id);
             }
         }
+
+        ModelDetailsButton.Content = AppText.Get(DisplayLanguage, TextId.ModelBreakdown).ToUpper(AppText.Culture(DisplayLanguage));
 
         if (_settingsButton is not null)
         {
