@@ -6,8 +6,14 @@ namespace CodexUsageTray;
 internal static class App
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        if (UpdateInstaller.TryRunApplyMode(args))
+        {
+            return;
+        }
+        UpdateInstaller.ScheduleCleanup(args);
+
         using var mutex = new Mutex(initiallyOwned: true, "Local\\CodexUsageTray", out var isFirstInstance);
         if (!isFirstInstance)
         {

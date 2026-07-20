@@ -1,3 +1,8 @@
+using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.Json;
 using CodexUsageTray;
 
@@ -28,6 +33,11 @@ var tests = new (string Name, Action Run)[]
     ("compact token formatting", CompactTokenFormatting),
     ("dollar formatting", DollarFormatting),
     ("API equivalent pricing", ApiEquivalentPricing),
+    ("application version parsing", ApplicationVersionParsing),
+    ("release update check", ReleaseUpdateCheck),
+    ("release update staging", ReleaseUpdateStaging),
+    ("update installer arguments", UpdateInstallerArguments),
+    ("update file replacement", UpdateFileReplacement),
     ("cache omits local paths", CacheOmitsLocalPaths),
     ("cache clear stays local", CacheClearStaysLocal),
     ("settings defaults and recovery", SettingsDefaultsAndRecovery),
@@ -102,6 +112,169 @@ static void ApiEquivalentPricing()
     // GPT-5.6 Sol: 1M uncached input + 1M cached input + 1M output.
     Equal(35.5m, ApiEquivalentEstimator.CalculateCost("gpt-5.6-sol", 2_000_000, 1_000_000, 1_000_000));
     Equal(0m, ApiEquivalentEstimator.CalculateCost("unknown-model", 1_000_000, 0, 0));
+}
+
+static void ApplicationVersionParsing()
+{
+    Equal(true, AppVersion.TryParse("v0.2.0", out var stable));
+    Equal(new AppVersion(0, 2, 0), stable);
+    Equal(true, AppVersion.TryParse("1.4.3-beta.1+build", out var prerelease));
+    Equal(new AppVersion(1, 4, 3), prerelease);
+    Equal(false, AppVersion.TryParse("release-next", out _));
+    Equal(true, new AppVersion(0, 3, 0).CompareTo(new AppVersion(0, 2, 9)) > 0);
+}
+
+static void ReleaseUpdateCheck()
+{
+    const string json = """
+        {
+          "tag_name": "v0.3.0",
+          "draft": false,
+          "prerelease": false,
+          "assets": [
+            {
+              "name": "CodexMeter-win-x64-standalone.zip",
+              "browser_download_url": "https://github.com/Ayoshy/Codex-Meter/releases/download/v0.3.0/CodexMeter-win-x64-standalone.zip",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 123456
+            },
+            {
+              "name": "CodexMeter-win-arm64-standalone.zip",
+              "browser_download_url": "https://github.com/Ayoshy/Codex-Meter/releases/download/v0.3.0/CodexMeter-win-arm64-standalone.zip",
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "size": 123456
+            }
+          ]
+        }
+        """;
+    using var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new StringContent(json)
+    });
+    using var client = new HttpClient(handler);
+    using var service = new ReleaseUpdateService(client);
+    var update = service.CheckAsync(new AppVersion(0, 2, 0)).GetAwaiter().GetResult()
+        ?? throw new Exception("expected update");
+    Equal(new AppVersion(0, 3, 0), update.Version);
+    Equal(
+        RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+            ? "CodexMeter-win-arm64-standalone.zip"
+            : "CodexMeter-win-x64-standalone.zip",
+        update.Asset.Name);
+
+    var current = service.CheckAsync(new AppVersion(0, 3, 0)).GetAwaiter().GetResult();
+    Equal<AvailableUpdate?>(null, current);
+}
+
+static void ReleaseUpdateStaging()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"codex-meter-update-{Guid.NewGuid():N}");
+    try
+    {
+        var currentExecutable = Path.Combine(AppContext.BaseDirectory, "CodexMeter.exe");
+        if (!File.Exists(currentExecutable))
+        {
+            throw new Exception("test app host unavailable");
+        }
+
+        byte[] archiveBytes;
+        using (var memory = new MemoryStream())
+        {
+            using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                var entry = archive.CreateEntry("CodexMeter.exe", CompressionLevel.NoCompression);
+                using var destination = entry.Open();
+                using var source = File.OpenRead(currentExecutable);
+                source.CopyTo(destination);
+            }
+            archiveBytes = memory.ToArray();
+        }
+
+        var digest = "sha256:" + Convert.ToHexString(SHA256.HashData(archiveBytes)).ToLowerInvariant();
+        using var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(archiveBytes)
+        });
+        using var client = new HttpClient(handler);
+        using var service = new ReleaseUpdateService(client, root);
+        var phases = new List<UpdatePhase>();
+        var progress = new ImmediateProgress<UpdateProgress>(value => phases.Add(value.Phase));
+        var update = new AvailableUpdate(
+            new AppVersion(0, 2, 0),
+            "v0.2.0",
+            new ReleaseAsset(
+                "CodexMeter-win-x64-standalone.zip",
+                new Uri("https://github.com/Ayoshy/Codex-Meter/releases/download/v0.2.0/CodexMeter-win-x64-standalone.zip"),
+                digest,
+                archiveBytes.Length));
+
+        var staged = service.DownloadAsync(update, progress).GetAwaiter().GetResult();
+        Equal(true, File.Exists(staged.ExecutablePath));
+        Equal(new AppVersion(0, 2, 0), staged.Version);
+        Equal(true, phases.Contains(UpdatePhase.Downloading));
+        Equal(true, phases.Contains(UpdatePhase.Verifying));
+        Equal(true, phases.Contains(UpdatePhase.Preparing));
+        Equal(
+            true,
+            ReleaseUpdateService.DigestMatchesAsync(
+                Path.Combine(staged.StagingDirectory, "CodexMeter.exe"),
+                "sha256:" + Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(staged.ExecutablePath))))
+                .GetAwaiter()
+                .GetResult());
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static void UpdateInstallerArguments()
+{
+    var staged = new StagedUpdate(
+        new AppVersion(0, 2, 0),
+        @"C:\updates\CodexMeter.exe",
+        @"C:\updates");
+    var startInfo = UpdateInstaller.CreateApplyStartInfo(
+        staged,
+        @"C:\apps\CodexMeter.exe",
+        1234);
+
+    Equal(@"C:\updates\CodexMeter.exe", startInfo.FileName);
+    Equal(4, startInfo.ArgumentList.Count);
+    Equal("--apply-update", startInfo.ArgumentList[0]);
+    Equal(@"C:\apps\CodexMeter.exe", startInfo.ArgumentList[1]);
+    Equal("1234", startInfo.ArgumentList[2]);
+    Equal(@"C:\updates", startInfo.ArgumentList[3]);
+}
+
+static void UpdateFileReplacement()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"codex-meter-replace-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(root);
+    try
+    {
+        var source = Path.Combine(root, "staged.exe");
+        var target = Path.Combine(root, "CodexMeter.exe");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "CodexMeter.exe"), source);
+        File.WriteAllText(target, "old-version");
+
+        var backup = UpdateInstaller.ReplaceExecutable(source, target);
+        Equal(true, File.Exists(backup));
+        Equal("old-version", File.ReadAllText(backup));
+        Equal(
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(source))),
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(target))));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }
 
 static void CacheOmitsLocalPaths()
@@ -328,4 +501,18 @@ static void Equal<T>(T expected, T actual)
     {
         throw new Exception($"expected '{expected}', got '{actual}'");
     }
+}
+
+sealed class StubHttpMessageHandler(
+    Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(responder(request));
+}
+
+sealed class ImmediateProgress<T>(Action<T> report) : IProgress<T>
+{
+    public void Report(T value) => report(value);
 }

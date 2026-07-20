@@ -10,8 +10,12 @@
     <AssemblyTitle>Codex Meter</AssemblyTitle>
     <Product>Codex Meter</Product>
     <Description>Read-only Codex usage monitor for Windows</Description>
+    <Version>0.2.0</Version>
     <RootNamespace>CodexUsageTray</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\CodexMeter.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodexUsageTray.Tests" />
+  </ItemGroup>
 </Project>

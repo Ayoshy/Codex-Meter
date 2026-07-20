@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release tags must use vMAJOR.MINOR.PATCH."
+          }
+          [xml] $project = Get-Content '.\src\CodexUsageTray\CodexUsageTray.csproj'
+          $projectVersion = [string] $project.Project.PropertyGroup.Version
+          if ($projectVersion -ne $version) {
+            throw "Tag version $version does not match project version $projectVersion."
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Restore
+        run: dotnet restore .\CodexUsageTray.sln
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet build .\CodexUsageTray.sln --configuration Release --no-restore
+          dotnet run --project .\tests\CodexUsageTray.Tests\CodexUsageTray.Tests.csproj --configuration Release --no-build
+
+      - name: Package standalone builds
+        shell: pwsh
+        run: |
+          $releaseRoot = Join-Path $PWD 'artifacts\release'
+          New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+          foreach ($runtime in @('win-x64', 'win-arm64')) {
+            $publish = Join-Path $releaseRoot $runtime
+            dotnet publish .\src\CodexUsageTray\CodexUsageTray.csproj `
+              --configuration Release `
+              --runtime $runtime `
+              --self-contained true `
+              -p:Version=$env:RELEASE_VERSION `
+              -p:PublishSingleFile=true `
+              -p:IncludeNativeLibrariesForSelfExtract=true `
+              --output $publish
+
+            $zipName = "CodexMeter-$runtime-standalone.zip"
+            $zipPath = Join-Path $releaseRoot $zipName
+            Compress-Archive -LiteralPath (Join-Path $publish 'CodexMeter.exe') -DestinationPath $zipPath
+            $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $zipName" | Set-Content -LiteralPath "$zipPath.sha256" -Encoding ascii
+            Remove-Item -LiteralPath $publish -Recurse -Force
+          }
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem -LiteralPath '.\artifacts\release' -File | ForEach-Object FullName
+          gh release create '${{ github.ref_name }}' $assets `
+            --verify-tag `
+            --generate-notes `
+            --title "Codex Meter ${{ github.ref_name }}"

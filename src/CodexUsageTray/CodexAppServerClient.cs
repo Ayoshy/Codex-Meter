@@ -72,7 +72,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
                 {
                     name = "codex-usage-tray",
                     title = "Codex Usage Tray",
-                    version = "0.1.0"
+                    version = AppVersion.Current.ToString()
                 },
                 capabilities = new
                 {

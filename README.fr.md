@@ -65,6 +65,11 @@ Cette version embarque .NET. Elle demande uniquement Windows 10/11 et une instal
 > [!NOTE]
 > L'exécutable n'est pas encore signé. Windows SmartScreen peut donc afficher un avertissement au premier lancement. Les empreintes SHA-256 sont publiées avec chaque release.
 
+À partir de la v0.2.0, Codex Meter vérifie le flux officiel des releases GitHub après son lancement. Lorsqu’une version plus récente est disponible, une seule confirmation télécharge le ZIP autonome correspondant, vérifie son empreinte SHA-256 fournie par GitHub, remplace l’exécutable portable après sa fermeture, puis relance automatiquement l’application.
+
+> [!IMPORTANT]
+> La v0.1.0 ne contient pas encore l’updater : le passage de la v0.1.0 à la v0.2.0 demande donc un dernier téléchargement manuel. Les versions suivantes utiliseront le parcours en un clic.
+
 ### Depuis les sources
 
 ```powershell
@@ -87,7 +92,7 @@ Codex Meter fonctionne en lecture seule :
 - il appelle uniquement `account/rateLimits/read` et `account/usage/read` ;
 - il laisse l'authentification à l'installation Codex existante ;
 - il ne lit, ne copie et ne stocke aucun cookie, clé API, access token ou refresh token ;
-- il ne transmet aucune donnée à un serveur tiers ;
+- il ne transmet aucune donnée d’usage ou de session Codex à un serveur tiers ; la vérification de mise à jour demande uniquement les métadonnées publiques de release à `api.github.com` ;
 - il ne consomme jamais de crédit de reset.
 
 Pour estimer le coût API, l'application lit les compteurs de tokens et le nom du modèle dans les fichiers de session locaux. Elle ne conserve ni prompt, ni réponse, ni contenu de conversation. Son cache contient uniquement des compteurs agrégés ; les chemins locaux sont remplacés par des empreintes SHA-256 afin de ne pas exposer le nom du profil Windows.
