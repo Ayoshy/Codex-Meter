@@ -1,10 +1,27 @@
+using System.Globalization;
 using System.Reflection;
 
 namespace CodexUsageTray;
 
-public readonly record struct AppVersion(int Major, int Minor, int Patch, int Revision = 0)
-    : IComparable<AppVersion>
+public readonly record struct AppVersion : IComparable<AppVersion>
 {
+    public AppVersion(int major, int minor, int patch)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(major);
+        ArgumentOutOfRangeException.ThrowIfNegative(minor);
+        ArgumentOutOfRangeException.ThrowIfNegative(patch);
+
+        Major = major;
+        Minor = minor;
+        Patch = patch;
+    }
+
+    public int Major { get; }
+
+    public int Minor { get; }
+
+    public int Patch { get; }
+
     public static AppVersion Current
     {
         get
@@ -13,7 +30,7 @@ public readonly record struct AppVersion(int Major, int Minor, int Patch, int Re
             var informational = assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion;
-            if (TryParse(informational, out var parsed))
+            if (TryParseProductVersion(informational, out var parsed))
             {
                 return parsed;
             }
@@ -24,57 +41,89 @@ public readonly record struct AppVersion(int Major, int Minor, int Patch, int Re
                 : new AppVersion(
                     version.Major,
                     Math.Max(0, version.Minor),
-                    Math.Max(0, version.Build),
-                    Math.Max(0, version.Revision));
+                    Math.Max(0, version.Build));
         }
     }
 
-    public static bool TryParse(string? value, out AppVersion version)
+    public static bool TryParseReleaseTag(string? value, out AppVersion version)
     {
         version = default;
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrEmpty(value) ||
+            value[0] != 'v')
         {
             return false;
         }
 
-        var normalized = value.Trim();
-        if (normalized.StartsWith('v') || normalized.StartsWith('V'))
-        {
-            normalized = normalized[1..];
-        }
+        return TryParseCore(value[1..], out version);
+    }
 
-        var suffix = normalized.IndexOfAny(['-', '+']);
-        if (suffix >= 0)
-        {
-            normalized = normalized[..suffix];
-        }
-
-        var parts = normalized.Split('.');
-        if (parts.Length is < 2 or > 4 ||
-            parts.Any(part => !int.TryParse(part, out var number) || number < 0))
+    public static bool TryParseProductVersion(string? value, out AppVersion version)
+    {
+        version = default;
+        if (string.IsNullOrEmpty(value))
         {
             return false;
         }
 
-        version = new AppVersion(
-            int.Parse(parts[0]),
-            int.Parse(parts[1]),
-            parts.Length > 2 ? int.Parse(parts[2]) : 0,
-            parts.Length > 3 ? int.Parse(parts[3]) : 0);
+        var metadataSeparator = value.IndexOf('+');
+        var core = value;
+        if (metadataSeparator >= 0)
+        {
+            var metadata = value[(metadataSeparator + 1)..];
+            if (!IsValidBuildMetadata(metadata))
+            {
+                return false;
+            }
+
+            core = value[..metadataSeparator];
+        }
+
+        return TryParseCore(core, out version);
+    }
+
+    private static bool TryParseCore(string value, out AppVersion version)
+    {
+        version = default;
+        var parts = value.Split('.');
+        if (parts.Length != 3)
+        {
+            return false;
+        }
+
+        Span<int> components = stackalloc int[3];
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var part = parts[index];
+            if (part.Length == 0 ||
+                part.Length > 1 && part[0] == '0' ||
+                part.Any(character => !char.IsAsciiDigit(character)) ||
+                !int.TryParse(
+                    part,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out components[index]))
+            {
+                return false;
+            }
+        }
+
+        version = new AppVersion(components[0], components[1], components[2]);
         return true;
     }
 
-    public int CompareTo(AppVersion other)
+    private static bool IsValidBuildMetadata(string metadata)
     {
-        var major = Major.CompareTo(other.Major);
-        if (major != 0) return major;
-        var minor = Minor.CompareTo(other.Minor);
-        if (minor != 0) return minor;
-        var patch = Patch.CompareTo(other.Patch);
-        return patch != 0 ? patch : Revision.CompareTo(other.Revision);
+        return metadata.Length > 0 &&
+               metadata[0] != '.' &&
+               metadata[^1] != '.' &&
+               !metadata.Contains("..", StringComparison.Ordinal) &&
+               metadata.All(character =>
+                   char.IsAsciiLetterOrDigit(character) ||
+                   character is '-' or '.');
     }
 
-    public override string ToString() => Revision == 0
-        ? $"{Major}.{Minor}.{Patch}"
-        : $"{Major}.{Minor}.{Patch}.{Revision}";
+    public int CompareTo(AppVersion other) =>
+        (Major, Minor, Patch).CompareTo((other.Major, other.Minor, other.Patch));
+
+    public override string ToString() => $"{Major}.{Minor}.{Patch}";
 }

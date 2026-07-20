@@ -69,7 +69,7 @@ public sealed class ReleaseUpdateService : IDisposable
         if (release is null ||
             release.Draft ||
             release.Prerelease ||
-            !AppVersion.TryParse(release.TagName, out var releaseVersion) ||
+            !AppVersion.TryParseReleaseTag(release.TagName, out var releaseVersion) ||
             releaseVersion.CompareTo(currentVersion) <= 0)
         {
             return null;
@@ -256,7 +256,7 @@ public sealed class ReleaseUpdateService : IDisposable
         var productVersion = System.Diagnostics.FileVersionInfo
             .GetVersionInfo(executablePath)
             .ProductVersion;
-        if (!AppVersion.TryParse(productVersion, out var executableVersion) ||
+        if (!AppVersion.TryParseProductVersion(productVersion, out var executableVersion) ||
             executableVersion != expectedVersion)
         {
             throw new InvalidDataException("The staged executable version does not match the release tag.");

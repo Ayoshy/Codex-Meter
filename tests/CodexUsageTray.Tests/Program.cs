@@ -119,12 +119,58 @@ static void ApiEquivalentPricing()
 
 static void ApplicationVersionParsing()
 {
-    Equal(true, AppVersion.TryParse("v0.2.0", out var stable));
-    Equal(new AppVersion(0, 2, 0), stable);
-    Equal(true, AppVersion.TryParse("1.4.3-beta.1+build", out var prerelease));
-    Equal(new AppVersion(1, 4, 3), prerelease);
-    Equal(false, AppVersion.TryParse("release-next", out _));
+    var validReleaseTags = new (string Value, AppVersion Expected)[]
+    {
+        ("v0.2.0", new AppVersion(0, 2, 0)),
+        ("v12.48.731", new AppVersion(12, 48, 731))
+    };
+    foreach (var (value, expected) in validReleaseTags)
+    {
+        Equal(true, AppVersion.TryParseReleaseTag(value, out var actual));
+        Equal(expected, actual);
+    }
+
+    string?[] invalidReleaseTags =
+    [
+        null,
+        "",
+        "0.3.0",
+        "V0.3.0",
+        "v0.3",
+        "v0.3.0-beta",
+        "v0.3.0.1",
+        "v0.3.0+build",
+        "v0..3",
+        "v-1.2.3",
+        "v01.2.3",
+        "v2147483648.2.3",
+        "v١.2.3",
+        " v1.2.3"
+    ];
+    foreach (var value in invalidReleaseTags)
+    {
+        Equal(false, AppVersion.TryParseReleaseTag(value, out _));
+    }
+
+    var validProductVersions = new (string Value, AppVersion Expected)[]
+    {
+        ("0.2.0", new AppVersion(0, 2, 0)),
+        ("0.2.0+e0e128af", new AppVersion(0, 2, 0)),
+        ("12.48.731+build.42-local", new AppVersion(12, 48, 731))
+    };
+    foreach (var (value, expected) in validProductVersions)
+    {
+        Equal(true, AppVersion.TryParseProductVersion(value, out var actual));
+        Equal(expected, actual);
+    }
+
+    foreach (var value in new[] { "v0.2.0", "0.2", "0.2.0-beta", "0.2.0+", "0.2.0+build..42" })
+    {
+        Equal(false, AppVersion.TryParseProductVersion(value, out _));
+    }
+
     Equal(true, new AppVersion(0, 3, 0).CompareTo(new AppVersion(0, 2, 9)) > 0);
+    Equal("12.48.731", new AppVersion(12, 48, 731).ToString());
 }
 
 static void ReleaseUpdateCheck()
@@ -167,6 +213,20 @@ static void ReleaseUpdateCheck()
 
     var current = service.CheckAsync(new AppVersion(0, 3, 0)).GetAwaiter().GetResult();
     Equal<AvailableUpdate?>(null, current);
+
+    var mislabeledPrerelease = json.Replace(
+        "\"tag_name\": \"v0.3.0\"",
+        "\"tag_name\": \"v0.4.0-beta\"",
+        StringComparison.Ordinal);
+    using var prereleaseHandler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new StringContent(mislabeledPrerelease)
+    });
+    using var prereleaseClient = new HttpClient(prereleaseHandler);
+    using var prereleaseService = new ReleaseUpdateService(prereleaseClient);
+    Equal<AvailableUpdate?>(
+        null,
+        prereleaseService.CheckAsync(new AppVersion(0, 3, 0)).GetAwaiter().GetResult());
 }
 
 static void ReleaseUpdateStaging()
