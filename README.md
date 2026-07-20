@@ -65,6 +65,11 @@ This build bundles .NET. It only requires Windows 10/11 and an existing authenti
 > [!NOTE]
 > The executable is not signed yet, so Windows SmartScreen may display a warning on first launch. SHA-256 checksums are published with every release.
 
+Starting with v0.2.0, Codex Meter checks the official GitHub release feed after launch. When a newer version is available, one confirmation downloads the matching standalone ZIP, verifies its GitHub-provided SHA-256 digest, replaces the portable executable after it closes, and restarts the app automatically.
+
+> [!IMPORTANT]
+> v0.1.0 does not contain the updater yet, so moving from v0.1.0 to v0.2.0 still requires one final manual download. Later releases use the one-click flow.
+
 ### From source
 
 ```powershell
@@ -87,7 +92,7 @@ Codex Meter operates in read-only mode:
 - it only calls `account/rateLimits/read` and `account/usage/read`;
 - authentication remains entirely managed by the existing Codex installation;
 - it never reads, copies or stores cookies, API keys, access tokens or refresh tokens;
-- it sends no data to third-party servers;
+- it sends no Codex usage or session data to third-party servers; the startup update check only requests the public release metadata from `api.github.com`;
 - it never consumes reset credits.
 
 To estimate API-equivalent cost, the app reads token counters and model names from local Codex session files. It retains no prompts, responses or conversation content. Its cache only contains aggregated counters, and local paths are replaced with SHA-256 hashes so the Windows profile name is never exposed.

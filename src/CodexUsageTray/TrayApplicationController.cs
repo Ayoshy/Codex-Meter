@@ -14,6 +14,8 @@ internal sealed class TrayApplicationController : IDisposable
     private readonly ApiEquivalentEstimator _costEstimator = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly AppSettingsService _settingsService = new();
+    private readonly ReleaseUpdateService _updateService = new();
+    private readonly CancellationTokenSource _updateCancellation = new();
     private readonly Forms.ToolStripMenuItem _openMenuItem;
     private readonly Forms.ToolStripMenuItem _refreshMenuItem;
     private readonly Forms.ToolStripMenuItem _settingsMenuItem;
@@ -124,6 +126,86 @@ internal sealed class TrayApplicationController : IDisposable
         }
         _refreshTimer.Start();
         _ = RefreshAsync();
+        _ = CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var update = await _updateService
+                .CheckAsync(AppVersion.Current, _updateCancellation.Token);
+            if (update is null || _isExiting)
+            {
+                return;
+            }
+
+            var message = AppText.Format(
+                _settings.Language,
+                TextId.UpdateAvailableMessage,
+                update.Version);
+            var title = AppText.Get(_settings.Language, TextId.UpdateAvailableTitle);
+            var answer = _window.IsVisible
+                ? System.Windows.MessageBox.Show(
+                    _window,
+                    message,
+                    title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information)
+                : System.Windows.MessageBox.Show(
+                    message,
+                    title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+            if (answer != MessageBoxResult.Yes || _isExiting)
+            {
+                return;
+            }
+
+            var progressWindow = new UpdateProgressWindow(
+                _settings.Language,
+                update.Version,
+                _settings.UiScale);
+            if (_window.IsVisible)
+            {
+                progressWindow.Owner = _window;
+                progressWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            }
+            progressWindow.Show();
+
+            try
+            {
+                var progress = new Progress<UpdateProgress>(progressWindow.Report);
+                var staged = await _updateService
+                    .DownloadAsync(update, progress, _updateCancellation.Token);
+                UpdateInstaller.Launch(staged);
+                progressWindow.Close();
+                Exit();
+            }
+            catch (OperationCanceledException) when (_updateCancellation.IsCancellationRequested)
+            {
+                progressWindow.Close();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"Automatic update failed: {exception}");
+                progressWindow.Close();
+                System.Windows.MessageBox.Show(
+                    AppText.Get(_settings.Language, TextId.UpdateFailedMessage),
+                    AppText.Get(_settings.Language, TextId.UpdateFailedTitle),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+        catch (OperationCanceledException) when (_updateCancellation.IsCancellationRequested)
+        {
+            // Application shutdown cancels a pending update check.
+        }
+        catch (Exception exception)
+        {
+            // Update checks are best-effort and must never affect normal startup.
+            System.Diagnostics.Debug.WriteLine($"Update check unavailable: {exception.Message}");
+        }
     }
 
     private void ShowWindow()
@@ -323,10 +405,13 @@ internal sealed class TrayApplicationController : IDisposable
 
     public void Dispose()
     {
+        _updateCancellation.Cancel();
         _refreshTimer.Stop();
         _notifyIcon.Visible = false;
         _notifyIcon.Icon?.Dispose();
         _notifyIcon.Dispose();
+        _updateService.Dispose();
+        _updateCancellation.Dispose();
         _refreshGate.Dispose();
         _client.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
