@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private System.Windows.Rect _restoreBounds = new(100, 100, FullWidth, FullHeight);
     private bool _restoreTopmost;
     private double _zoom = 1d;
+    private UsageSnapshot? _latestSnapshot;
 
     public bool IsDocked { get; private set; }
 
@@ -92,6 +93,7 @@ public partial class MainWindow : Window
 
     public void Render(UsageSnapshot snapshot)
     {
+        _latestSnapshot = snapshot;
         SetRefreshEnabled(true);
         StatusBorder.Background = BrushFrom("#16271F");
         StatusBorder.BorderBrush = BrushFrom("#2B5A43");
@@ -127,6 +129,7 @@ public partial class MainWindow : Window
         ApiEquivalentText.ToolTip = estimateDetails;
         TodayApiEquivalentText.ToolTip = estimateDetails;
         SetEstimateVisibility();
+        ModelDetailsButton.IsEnabled = snapshot.ApiEquivalent?.Models.Count > 0;
 
         var mainWindow = snapshot.RateLimitResponse.RateLimits.Primary;
         var mainUsedPercent = Math.Clamp(mainWindow?.UsedPercent ?? 0, 0, 100);
@@ -162,6 +165,21 @@ public partial class MainWindow : Window
             _ => AppText.Format(DisplayLanguage, TextId.ManyResetCredits, resetCredits)
         };
         LastUpdatedText.Text = AppText.Format(DisplayLanguage, TextId.SyncedAt, snapshot.FetchedAt.ToString("HH:mm:ss", DisplayCulture));
+    }
+
+    private void ModelDetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_latestSnapshot?.ApiEquivalent is not { Models.Count: > 0 } estimate)
+        {
+            return;
+        }
+
+        var window = new ModelBreakdownWindow(estimate, _settings)
+        {
+            Owner = this
+        };
+        window.UiScaleChanged += zoom => PublishSettings(_settings with { UiScale = zoom });
+        window.ShowDialog();
     }
 
     private string BuildEstimateTooltip(ApiEquivalentEstimate? estimate)
@@ -458,7 +476,7 @@ public partial class MainWindow : Window
 
     private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
         {
             return;
         }

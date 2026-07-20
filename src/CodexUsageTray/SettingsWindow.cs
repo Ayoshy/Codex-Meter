@@ -11,6 +11,9 @@ namespace CodexUsageTray;
 
 public partial class SettingsWindow : Window
 {
+    private const double BaseWidth = 500;
+    private const double BaseHeight = 780;
+    private const double ZoomStep = 0.10;
     private AppSettings _settings;
     private bool _applying;
 
@@ -56,6 +59,7 @@ public partial class SettingsWindow : Window
     public void ApplySettings(AppSettings settings)
     {
         _settings = AppSettingsService.Normalize(settings);
+        ApplyWindowScale(_settings.UiScale);
         _applying = true;
         try
         {
@@ -219,6 +223,38 @@ public partial class SettingsWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var direction = e.Delta > 0 ? ZoomStep : -ZoomStep;
+        var updated = AppSettingsService.Normalize(_settings with { UiScale = _settings.UiScale + direction });
+        if (Math.Abs(updated.UiScale - _settings.UiScale) < 0.001)
+        {
+            return;
+        }
+
+        ApplySettings(updated);
+        SettingsChanged?.Invoke(this, updated);
+    }
+
+    private void ApplyWindowScale(double zoom)
+    {
+        var oldCenter = new System.Windows.Point(Left + (Width / 2), Top + (Height / 2));
+        RootLayout.LayoutTransform = new ScaleTransform(zoom, zoom);
+        Width = BaseWidth * zoom;
+        Height = BaseHeight * zoom;
+        if (IsLoaded)
+        {
+            Left = oldCenter.X - (Width / 2);
+            Top = oldCenter.Y - (Height / 2);
+        }
+    }
 
     private void Window_KeyDown(object sender, InputKeyEventArgs e)
     {

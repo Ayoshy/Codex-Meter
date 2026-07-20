@@ -38,7 +38,10 @@ var tests = new (string Name, Action Run)[]
     ("release update staging", ReleaseUpdateStaging),
     ("update installer arguments", UpdateInstallerArguments),
     ("update file replacement", UpdateFileReplacement),
+    ("model usage breakdown", ModelUsageBreakdown),
     ("cache omits local paths", CacheOmitsLocalPaths),
+    ("mixed session attribution", MixedSessionAttribution),
+    ("model breakdown ordering", ModelBreakdownOrderingTests),
     ("cache clear stays local", CacheClearStaysLocal),
     ("settings defaults and recovery", SettingsDefaultsAndRecovery),
     ("settings persistence", SettingsPersistence),
@@ -275,6 +278,198 @@ static void UpdateFileReplacement()
             Directory.Delete(root, recursive: true);
         }
     }
+}
+
+static void ModelUsageBreakdown()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"codex-meter-models-{Guid.NewGuid():N}");
+    var sessionDirectory = Path.Combine(root, "sessions", "2026", "07", "20");
+    var cachePath = Path.Combine(root, "cache.json");
+    Directory.CreateDirectory(sessionDirectory);
+
+    try
+    {
+        WriteRollout("01", "gpt-5.6-luna", "medium", 1_000_000, 500_000, 100_000, 1_100_000);
+        WriteRollout("02", "gpt-5.6-luna", "medium", 2_000_000, 1_000_000, 200_000, 2_200_000);
+        WriteRollout("03", "gpt-5.6-sol", "xhigh", 1_000_000, 0, 100_000, 1_100_000);
+
+        var estimate = new ApiEquivalentEstimator(root, cachePath)
+            .EstimateAsync(authoritativeLifetimeTokens: null)
+            .GetAwaiter()
+            .GetResult() ?? throw new Exception("estimate unavailable");
+
+        Equal(2, estimate.Models.Count);
+        var luna = estimate.Models.Single(item => item.Model == "gpt-5.6-luna");
+        Equal("medium", luna.Effort);
+        Equal(2, luna.Sessions);
+        Equal(3_000_000L, luna.InputTokens);
+        Equal(1_500_000L, luna.CachedInputTokens);
+        Equal(300_000L, luna.OutputTokens);
+        Equal(3_300_000L, luna.TotalTokens);
+        Equal(3.45m, luna.DollarAmount);
+        Equal(75d, Math.Round(luna.TokenSharePercent, 6));
+        Equal(11.45m, estimate.Models.Sum(item => item.DollarAmount ?? 0m));
+        Equal(estimate.DollarAmount, estimate.Models.Sum(item => item.DollarAmount ?? 0m));
+
+        void WriteRollout(
+            string suffix,
+            string model,
+            string effort,
+            long input,
+            long cached,
+            long output,
+            long total)
+        {
+            var path = Path.Combine(
+                sessionDirectory,
+                $"rollout-2026-07-20T12-00-{suffix}-00000000-0000-0000-0000-0000000000{suffix}.jsonl");
+            File.WriteAllLines(
+                path,
+                [
+                    JsonSerializer.Serialize(new { type = "turn_context", payload = new { model, effort } }),
+                    JsonSerializer.Serialize(new
+                    {
+                        type = "event_msg",
+                        payload = new
+                        {
+                            type = "token_count",
+                            info = new
+                            {
+                                total_token_usage = new
+                                {
+                                    input_tokens = input,
+                                    cached_input_tokens = cached,
+                                    output_tokens = output,
+                                    total_tokens = total
+                                }
+                            }
+                        }
+                    })
+                ]);
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static void MixedSessionAttribution()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"codex-meter-mixed-{Guid.NewGuid():N}");
+    var sessionDirectory = Path.Combine(root, "sessions", "2026", "07", "20");
+    var cachePath = Path.Combine(root, "cache.json");
+    var rolloutPath = Path.Combine(
+        sessionDirectory,
+        "rollout-2026-07-20T12-00-00-00000000-0000-0000-0000-000000000000.jsonl");
+    Directory.CreateDirectory(sessionDirectory);
+
+    try
+    {
+        File.WriteAllLines(
+            rolloutPath,
+            [
+                Context("gpt-5.6-sol", "ultra"),
+                Usage(2_000_000, 1_000_000, 1_000_000, 3_000_000),
+                Context("gpt-5.6-luna", "medium"),
+                Usage(4_000_000, 2_000_000, 2_000_000, 6_000_000)
+            ]);
+
+        var estimator = new ApiEquivalentEstimator(root, cachePath);
+        var estimate = estimator.EstimateAsync(null).GetAwaiter().GetResult()
+            ?? throw new Exception("estimate unavailable");
+        Equal(1, estimate.ParsedSessions);
+        Equal(6_000_000L, estimate.ParsedTokens);
+        Equal(2, estimate.Models.Count);
+        Equal(35.5m, estimate.Models.Single(item => item.Model == "gpt-5.6-sol").DollarAmount);
+        Equal(7.1m, estimate.Models.Single(item => item.Model == "gpt-5.6-luna").DollarAmount);
+
+        File.AppendAllLines(
+            rolloutPath,
+            [
+                Context("gpt-5.6-sol", "xhigh"),
+                Usage(5_000_000, 2_000_000, 3_000_000, 8_000_000)
+            ]);
+
+        estimate = estimator.EstimateAsync(null).GetAwaiter().GetResult()
+            ?? throw new Exception("updated estimate unavailable");
+        Equal(8_000_000L, estimate.ParsedTokens);
+        Equal(3, estimate.Models.Count);
+        Equal(35m, estimate.Models.Single(item => item.Effort == "xhigh").DollarAmount);
+
+        var cachedEstimate = new ApiEquivalentEstimator(root, cachePath)
+            .EstimateAsync(null)
+            .GetAwaiter()
+            .GetResult() ?? throw new Exception("cached estimate unavailable");
+        Equal(estimate.ParsedTokens, cachedEstimate.ParsedTokens);
+        Equal(estimate.DollarAmount, cachedEstimate.DollarAmount);
+        Equal(estimate.Models.Count, cachedEstimate.Models.Count);
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    static string Context(string model, string effort) =>
+        JsonSerializer.Serialize(new { type = "turn_context", payload = new { model, effort } });
+
+    static string Usage(long input, long cached, long output, long total) =>
+        JsonSerializer.Serialize(new
+        {
+            type = "event_msg",
+            payload = new
+            {
+                type = "token_count",
+                info = new
+                {
+                    total_token_usage = new
+                    {
+                        input_tokens = input,
+                        cached_input_tokens = cached,
+                        output_tokens = output,
+                        total_tokens = total
+                    }
+                }
+            }
+        });
+}
+
+static void ModelBreakdownOrderingTests()
+{
+    var efforts = new[] { "medium", "ultra", "low", "max", "xhigh", "high", "unspecified" }
+        .Select((effort, index) => new ModelUsageBreakdown(
+            Model: $"model-{index}",
+            Effort: effort,
+            InputTokens: index,
+            CachedInputTokens: 0,
+            OutputTokens: 0,
+            TotalTokens: index,
+            Sessions: index,
+            DollarAmount: index == 6 ? null : index,
+            TokenSharePercent: index))
+        .ToArray();
+
+    Equal(
+        "ultra,xhigh,max,high,medium,low,unspecified",
+        string.Join(",", ModelBreakdownOrdering
+            .Sort(efforts, ModelBreakdownSort.Effort, descending: true)
+            .Select(item => item.Effort)));
+    Equal(
+        "low,medium,high,max,xhigh,ultra,unspecified",
+        string.Join(",", ModelBreakdownOrdering
+            .Sort(efforts, ModelBreakdownSort.Effort, descending: false)
+            .Select(item => item.Effort)));
+    Equal(
+        "model-5,model-4,model-3,model-2,model-1,model-0,model-6",
+        string.Join(",", ModelBreakdownOrdering
+            .Sort(efforts, ModelBreakdownSort.Cost, descending: true)
+            .Select(item => item.Model)));
 }
 
 static void CacheOmitsLocalPaths()
