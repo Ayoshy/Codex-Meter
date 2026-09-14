@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src http://127.0.0.1:19187 http://127.0.0.1:19188">
+  <title>GTA VI — Vice City is calling</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="conrad.css">
+  <script src="conrad-connection.js" defer></script>
+  <script src="config.js" defer></script>
+  <script src="countdown.js" defer></script>
+  <script src="overlays.js" defer></script>
+  <script src="wallpaper.js" defer></script>
+  <script src="conrad.js" defer></script>
+  <link rel="stylesheet" href="codex-meter.css">
+  <script src="codex-connection.js" defer></script>
+  <script src="codex-meter.js" defer></script>
+</head>
+<body>
+  <div class="scene" aria-hidden="true">
+    <div class="dual-backdrop"></div>
+    <img class="artwork" id="artwork" src="assets/jason-lucia.jpg" alt="">
+    <div class="grade"></div>
+    <div class="shade"></div>
+    <div class="ambient ambient-pink" id="pink-light"></div>
+    <div class="ambient ambient-gold" id="gold-light"></div>
+    <div class="vignette"></div>
+    <canvas id="particles"></canvas>
+  </div>
+  <main id="composition">
+    <div class="eyebrow"><span></span> VICE CITY IS CALLING <span></span></div>
+    <div class="brand" id="brand"><div class="brand-glow" id="brand-glow"></div><img src="assets/logo.png" alt="Grand Theft Auto VI"></div>
+    <div class="countdown" id="countdown" role="timer" aria-label="Compte à rebours">
+      <div class="unit days-unit"><span class="number" id="days">00</span><span class="unit-label">JOURS</span></div>
+      <span class="separator" aria-hidden="true"></span>
+      <div class="unit"><span class="number" id="hours">00</span><span class="unit-label">HEURES</span></div>
+      <span class="separator" aria-hidden="true"></span>
+      <div class="unit"><span class="number" id="minutes">00</span><span class="unit-label">MINUTES</span></div>
+      <span class="separator seconds-element" aria-hidden="true"></span>
+      <div class="unit seconds-unit seconds-element"><span class="number" id="seconds">00</span><span class="unit-label">SECONDES</span></div>
+    </div>
+    <div id="arrival" hidden>VICE CITY VOUS ATTEND.</div>
+    <div class="date-line" id="date-line"><span></span><time id="release-date" datetime="2026-11-19">19 NOVEMBRE 2026</time><span></span></div>
+    <section id="conrad" aria-label="Conrad Sensor">
+      <header class="sensor-header">
+        <span class="sensor-signature"><i id="sensor-dot"></i> CONRAD <b>SENSOR</b></span>
+        <span id="sensor-status" role="status">CONNEXION…</span>
+      </header>
+      <div class="sensor-metrics">
+        <div class="sensor-metric"><div class="sensor-label">CPU <span id="sensor-cpu-load">—</span></div><strong id="sensor-cpu">—</strong><div class="sensor-track"><i id="sensor-cpu-bar"></i></div></div>
+        <div class="sensor-metric gpu"><div class="sensor-label">GPU <span id="sensor-gpu-load">—</span></div><strong id="sensor-gpu">—</strong><div class="sensor-track"><i id="sensor-gpu-bar"></i></div></div>
+        <div class="sensor-aux"><div><span>VENTILATEUR</span><strong id="sensor-fan">—</strong></div><div><span>PUISSANCE</span><strong id="sensor-power">—</strong></div></div>
+      </div>
+      <nav class="sensor-actions" aria-label="Commandes Conrad">
+        <button id="sensor-details-button" aria-expanded="false" aria-controls="sensor-details">6 CŒURS <span>＋</span></button>
+        <button id="sensor-cooling-button" aria-expanded="false" aria-controls="sensor-cooling">REFROIDISSEMENT <span>⚙</span></button>
+        <button id="sensor-heatwave" aria-pressed="false" disabled><span>♨</span> CANICULE</button>
+      </nav>
+      <div id="sensor-details" class="sensor-drawer" hidden>
+        <div class="sensor-section-label">INTEL CORE i5-9600KF <span>PLUS CHAUD <b id="sensor-hottest">—</b></span></div>
+        <div id="sensor-cores"></div>
+      </div>
+      <div id="sensor-cooling" class="sensor-drawer" hidden>
+        <div class="sensor-section-label">RTX 2060 SUPER <span id="sensor-control-status">CONNEXION…</span></div>
+        <fieldset id="sensor-controls" disabled>
+          <label class="sensor-auto"><input id="sensor-manual" type="checkbox"> Ventilateur manuel</label>
+          <label class="sensor-slider">Ventilateur <output id="sensor-fan-target">AUTO</output><input id="sensor-fan-slider" type="range" min="0" max="100" step="1" value="38" disabled></label>
+          <label class="sensor-slider">Cible thermique <output id="sensor-thermal-target">—</output><input id="sensor-thermal-slider" type="range" min="0" max="100" step="1" value="65" disabled></label>
+          <button id="sensor-apply">APPLIQUER AU GPU</button>
+        </fieldset>
+      </div>
+      <p id="sensor-error" role="alert" hidden></p>
+    </section>
+    <section id="codex-meter" aria-label="Codex Meter">
+      <header class="meter-header"><span><i id="meter-dot"></i> CODEX <b>METER</b></span><span id="meter-status" role="status">CONNEXION…</span></header>
+      <div class="meter-overview">
+        <div class="meter-quota"><span id="meter-primary-label">QUOTA</span><strong id="meter-primary">—</strong><small>RESTANT</small><div class="meter-track"><i id="meter-primary-bar"></i></div><time id="meter-primary-reset">—</time></div>
+        <div class="meter-quota" id="meter-secondary-card"><span id="meter-secondary-label">QUOTA</span><strong id="meter-secondary">—</strong><small>RESTANT</small><div class="meter-track"><i id="meter-secondary-bar"></i></div><time id="meter-secondary-reset">—</time></div>
+        <div class="meter-tokens"><span>TOKENS DU JOUR</span><strong id="meter-today">—</strong><span>ÉQUIV. API ESTIMÉ</span><strong id="meter-today-cost">—</strong></div>
+      </div>
+      <nav class="meter-actions" aria-label="Commandes Codex Meter">
+        <button id="meter-limits-button" aria-expanded="false" aria-controls="meter-limits">QUOTAS <span>＋</span></button>
+        <button id="meter-models-button" aria-expanded="false" aria-controls="meter-models">MODÈLES <span>＋</span></button>
+        <button id="meter-refresh" disabled>ACTUALISER <span>↻</span></button>
+      </nav>
+      <div id="meter-limits" class="meter-drawer" hidden><div id="meter-limit-list"></div><p id="meter-credits"></p></div>
+      <div id="meter-models" class="meter-drawer" hidden><div class="meter-summary"><span>TOKENS CUMULÉS <b id="meter-total">—</b></span><span>ÉQUIV. API ESTIMÉ <b id="meter-total-cost">—</b></span></div><div id="meter-model-list"></div><p id="meter-model-note">Estimation cumulée, pas une facture.</p></div>
+      <p id="meter-error" role="alert" hidden></p>
+    </section>
+  </main>
+  <button id="settings-button" hidden>RÉGLAGES</button>
+  <aside id="settings-panel" hidden aria-label="Réglages du fond d’écran">
+    <button id="close-settings" aria-label="Fermer">×</button>
+    <h1>Votre Vice City.</h1>
+    <p class="panel-intro">Réglez l’ambiance et la place du compteur.</p>
+    <form id="settings-form">
+      <label>Ambiance<select name="theme"><option value="sunset">Coucher de soleil</option><option value="night">Nuit néon</option></select></label>
+      <label>Disposition des écrans<select name="screenlayout"><option value="auto">Automatique — simple ou double écran</option><option value="single">Un écran — 2560 × 1440</option><option value="dual">Deux écrans côte à côte — 5120 × 1440</option></select></label>
+      <label>Date et heure visées<input name="targetdate" type="text" spellcheck="false" aria-describedby="date-help"></label>
+      <p class="help" id="date-help">Format : 2026-11-19T00:00:00+01:00. Minuit à Paris est un repère choisi, à adapter à l’horaire de sortie.</p>
+      <p id="date-error" class="error" hidden>Date invalide : conservez le format complet et le fuseau horaire.</p>
+      <label>Position horizontale<input name="positionx" type="range" min="15" max="85" step="1"></label>
+      <label>Position verticale<input name="positiony" type="range" min="25" max="75" step="1"></label>
+      <label>Taille du compteur et du logo<input name="scale" type="range" min="65" max="125" step="1"></label>
+      <label>Assombrissement<input name="darkness" type="range" min="0" max="70" step="1"></label>
+      <label class="toggle"><input name="showseconds" type="checkbox">Afficher les secondes</label>
+      <label class="toggle"><input name="showlogo" type="checkbox">Afficher le logo</label>
+      <label class="toggle"><input name="showdate" type="checkbox">Afficher la date</label>
+      <label class="toggle"><input name="motion" type="checkbox">Mouvement lent et lueurs</label>
+      <label class="toggle"><input name="parallax" type="checkbox">Profondeur au mouvement de la souris</label>
+      <h2 class="settings-section">Lumières en surimpression</h2>
+      <label>Intensité des effets<input name="fxintensity" type="range" min="0" max="100" step="1"></label>
+      <label>Densité des particules<input name="particledensity" type="range" min="0" max="100" step="1"></label>
+      <label>Vitesse des effets<input name="fxspeed" type="range" min="10" max="150" step="1"></label>
+      <label class="toggle"><input name="particles" type="checkbox">Particules lumineuses</label>
+      <label class="toggle"><input name="bokeh" type="checkbox">Halos flous au premier plan</label>
+      <label class="toggle"><input name="lightbeams" type="checkbox">Rayons lumineux mobiles</label>
+      <label class="toggle"><input name="lightstreaks" type="checkbox">Traînées lumineuses</label>
+      <button type="button" class="save" id="export-settings">Télécharger mes réglages</button>
+      <button type="button" class="reset" id="reset-settings">Réglages d’origine</button>
+      <p class="help">Pour conserver vos choix dans le pack, remplacez son fichier config.js par celui téléchargé. Wallpaper Engine propose aussi ces réglages dans son panneau de propriétés.</p>
+    </form>
+  </aside>
+</body>
+</html>

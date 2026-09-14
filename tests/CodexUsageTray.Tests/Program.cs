@@ -49,7 +49,9 @@ var tests = new (string Name, Action Run)[]
     ("localization catalog completeness", LocalizationCatalogCompleteness),
     ("window labels", WindowLabels),
     ("today token lookup", TodayTokenLookup),
-    ("main limit ordering", MainLimitOrdering)
+    ("main limit ordering", MainLimitOrdering),
+    ("wallpaper data projection", WallpaperBridgeTests.Projection),
+    ("wallpaper authenticated HTTP", () => WallpaperBridgeTests.Http().GetAwaiter().GetResult())
 };
 
 var failures = 0;
@@ -263,17 +265,17 @@ static void ReleaseUpdateStaging()
         var phases = new List<UpdatePhase>();
         var progress = new ImmediateProgress<UpdateProgress>(value => phases.Add(value.Phase));
         var update = new AvailableUpdate(
-            new AppVersion(0, 2, 0),
-            "v0.2.0",
+            AppVersion.Current,
+            $"v{AppVersion.Current}",
             new ReleaseAsset(
                 "CodexMeter-win-x64-standalone.zip",
-                new Uri("https://github.com/Ayoshy/Codex-Meter/releases/download/v0.2.0/CodexMeter-win-x64-standalone.zip"),
+                new Uri($"https://github.com/Ayoshy/Codex-Meter/releases/download/v{AppVersion.Current}/CodexMeter-win-x64-standalone.zip"),
                 digest,
                 archiveBytes.Length));
 
         var staged = service.DownloadAsync(update, progress).GetAwaiter().GetResult();
         Equal(true, File.Exists(staged.ExecutablePath));
-        Equal(new AppVersion(0, 2, 0), staged.Version);
+        Equal(AppVersion.Current, staged.Version);
         Equal(true, phases.Contains(UpdatePhase.Downloading));
         Equal(true, phases.Contains(UpdatePhase.Verifying));
         Equal(true, phases.Contains(UpdatePhase.Preparing));

@@ -80,6 +80,30 @@ dotnet run --project .\src\CodexUsageTray\CodexUsageTray.csproj
 
 ## Options
 
+### Local GTA VI wallpaper integration
+
+Local version 0.2.1 adds the files under `integrations/gta-vi-wallpaper` for the
+existing GTA wallpaper. Copy them into that wallpaper, run
+`scripts/pair-wallpaper.ps1` (optionally with `-WallpaperPath`), and reload it.
+Keep Codex Meter running, optionally in tray-only mode. Quotas, reset times,
+today's tokens, estimated API equivalents and model details appear beside the
+existing Conrad panel; Refresh performs the normal read-only usage query.
+
+The bridge listens only on `127.0.0.1:19188` and requires a private pairing token.
+Never publish generated `codex-connection.js` or `wallpaper-token.txt` files.
+Only display counters and model names are shared locally, without account IDs,
+credentials, session paths or conversations. There is no reset-credit action.
+The wallpaper polls cached data every 15 seconds and suspends polling while
+paused. Codex's actual refresh interval remains the app setting. Missing data
+and unavailable zero-dollar estimates display a dash.
+
+Framework-dependent builds now need both the .NET Desktop 8 and ASP.NET Core 8
+runtimes; standalone builds include them. `scripts/check-wallpaper.cjs` tests
+the UI and a real read-only refresh using `playwright-core`; optionally specify
+`PLAYWRIGHT_MODULE` and `CHROMIUM_EXECUTABLE` for an existing installation.
+
+### Application settings
+
 Open **Settings** from the tray menu or the gear in the full window. English is the default language; switch to Français instantly from either the Options screen or `Language` in the tray menu.
 
 Options are stored locally in `%LOCALAPPDATA%\CodexMeter\settings.json` and cover the refresh interval (1/5/15 minutes), startup behavior (full window, compact widget, tray only, or last used view), UI scale (80–150%), compact-widget corner and always-on-top behavior, optional launch with Windows, the last view, and the last full-window position. API-equivalent estimation can be disabled; when disabled, Codex Meter does not enumerate or read local session files. **Clear local estimate cache** only removes Codex Meter’s derived cache, never Codex sessions. **Reset settings** restores the application defaults.

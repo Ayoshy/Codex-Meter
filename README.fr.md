@@ -80,6 +80,44 @@ dotnet run --project .\src\CodexUsageTray\CodexUsageTray.csproj
 
 ## Options
 
+### Intégration locale au fond GTA VI
+
+La version locale 0.2.1 ajoute une liaison au fond Wallpaper Engine dans
+`integrations/gta-vi-wallpaper`. Les quotas restants, resets, tokens du jour,
+estimations API et détails cumulés par modèle s'affichent dans un bloc néon
+sur l'écran du timer. Le bouton **Actualiser** déclenche la même lecture que
+l'application. Aucun crédit de reset ne peut être consommé depuis le fond.
+
+Copiez les fichiers d'intégration dans le fond GTA existant, puis lancez :
+
+```powershell
+& .\scripts\pair-wallpaper.ps1
+```
+
+Le paramètre `-WallpaperPath` permet de choisir un autre dossier. Gardez Codex
+Meter lancé, éventuellement en mode **Tray uniquement**, et rechargez le fond.
+Conrad Sensor et Codex Meter restent indépendants : chaque bloc se reconnecte
+à son application. Le service Codex Meter écoute uniquement sur
+`127.0.0.1:19188` et exige la clé privée de cette association. Ne publiez jamais
+le fichier généré `codex-connection.js` ou `wallpaper-token.txt`.
+Seuls les compteurs d'affichage et les noms de modèles sont transmis localement,
+sans identifiant de compte, authentification, chemin de session ou conversation.
+
+Le fond interroge les données en cache toutes les 15 secondes ; la lecture Codex
+conserve l'intervalle configuré dans l'application. La pause Wallpaper Engine
+suspend les lectures du fond, et les valeurs indisponibles s'affichent « — ».
+Les montants restent les estimations de Codex Meter ; les tarifs manquants
+ne sont pas inventés. La connexion HTTP utilise le runtime ASP.NET Core 8 en
+plus du runtime Desktop 8 pour les publications non autonomes. La version
+autonome embarque ces dépendances.
+
+`scripts/check-wallpaper.cjs` vérifie l'interface et une actualisation réelle en
+lecture seule avec `playwright-core`. Les variables `PLAYWRIGHT_MODULE` et
+`CHROMIUM_EXECUTABLE` peuvent désigner une installation existante ; les captures
+et les exécutables de validation sont placés dans `artifacts`.
+
+### Réglages de l'application
+
 Ouvrez **Paramètres** depuis le menu du tray ou la roue dentée de la fenêtre complète. L’anglais est la langue par défaut ; passez instantanément en Français depuis l’écran Options ou le sous-menu `Langue` du tray.
 
 Les réglages sont stockés localement dans `%LOCALAPPDATA%\CodexMeter\settings.json` : intervalle d’actualisation (1/5/15 minutes), comportement au démarrage (fenêtre complète, widget compact, tray uniquement ou dernière vue utilisée), échelle d’interface (80–150 %), coin d’ancrage et premier plan du widget compact, lancement facultatif avec Windows, dernière vue et dernière position de la fenêtre complète. L’estimation équivalente API peut être désactivée ; dans ce cas, Codex Meter n’énumère ni ne lit les fichiers de sessions locaux. **Effacer le cache local d’estimation** supprime uniquement le cache dérivé de Codex Meter, jamais les sessions Codex. **Réinitialiser les réglages** restaure les valeurs par défaut de l’application.

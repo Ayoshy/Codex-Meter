@@ -28,6 +28,9 @@ internal sealed class TrayApplicationController : IDisposable
     private SettingsWindow? _settingsWindow;
     private bool _isExiting;
     private bool _hasSnapshot;
+    private readonly WallpaperBridge _wallpaperBridge;
+    private bool _refreshing;
+    private string? _wallpaperError;
 
     public TrayApplicationController(System.Windows.Application application)
     {
@@ -99,6 +102,8 @@ internal sealed class TrayApplicationController : IDisposable
         };
         _refreshTimer.Tick += async (_, _) => await RefreshAsync();
         ApplyTrayLocalization();
+        _wallpaperBridge = new WallpaperBridge(WallpaperBridge.LoadToken(),
+            () => _application.Dispatcher.InvokeAsync(RefreshAsync).Task.Unwrap());
     }
 
     public void Start()
@@ -127,7 +132,21 @@ internal sealed class TrayApplicationController : IDisposable
         _refreshTimer.Start();
         _ = RefreshAsync();
         _ = CheckForUpdatesAsync();
+        _ = StartWallpaperBridgeAsync();
     }
+
+    private async Task StartWallpaperBridgeAsync()
+    {
+        try { await _wallpaperBridge.StartAsync(); }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Wallpaper bridge unavailable: {exception.Message}");
+        }
+    }
+
+    private void PublishWallpaperState() => _wallpaperBridge.State = new(
+        _lastSnapshot is null ? null : WallpaperUsage.From(_lastSnapshot),
+        _refreshing, _wallpaperError, _settings.RefreshIntervalMinutes);
 
     private async Task CheckForUpdatesAsync()
     {
@@ -288,6 +307,7 @@ internal sealed class TrayApplicationController : IDisposable
             _window.Render(_lastSnapshot);
             UpdateTray(_lastSnapshot);
         }
+        PublishWallpaperState();
     }
     private async Task ClearEstimateCacheAsync()
     {
@@ -303,6 +323,9 @@ internal sealed class TrayApplicationController : IDisposable
 
         try
         {
+            _refreshing = true;
+            _wallpaperError = null;
+            PublishWallpaperState();
             _window.SetLoading();
             var snapshot = await _client.ReadUsageAsync();
             if (_settings.ApiEquivalentEnabled)
@@ -325,6 +348,7 @@ internal sealed class TrayApplicationController : IDisposable
         catch (Exception exception)
         {
             var message = FriendlyError(exception, _settings.Language);
+            _wallpaperError = "Synchronisation Codex indisponible.";
             _window.ShowError(message);
             _notifyIcon.Text = TruncateTooltip($"Codex Meter · {AppText.Get(_settings.Language, TextId.SyncError)}");
             if (!_hasSnapshot)
@@ -338,6 +362,8 @@ internal sealed class TrayApplicationController : IDisposable
         }
         finally
         {
+            _refreshing = false;
+            PublishWallpaperState();
             _refreshGate.Release();
         }
     }
@@ -405,6 +431,7 @@ internal sealed class TrayApplicationController : IDisposable
 
     public void Dispose()
     {
+        _wallpaperBridge.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _updateCancellation.Cancel();
         _refreshTimer.Stop();
         _notifyIcon.Visible = false;
